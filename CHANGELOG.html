@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>CookingGrenades 更新日志</title>
+    <link rel="stylesheet" href="changelog.css">
+</head>
+<body>
+<div class="changelog">
+
+    <h1>CookingGrenades 更新日志</h1>
+
+    <h2>版本 1.2.1 — 温雷提示图标 &amp; SPT 4.1.0 适配</h2>
+
+    <div class="section">
+        <h3><span class="tag tag-new">新增</span> 新增功能</h3>
+        <ul>
+            <li><strong>手雷抛物线预测</strong>：拿在手上瞄准（高抛/低抛）时显示轨迹线和落点标记
+                <ul class="sub-list">
+                    <li>可在 F12 配置菜单开关（默认开启）</li>
+                    <li>支持自定义轨迹颜色、线宽、采样点数、刷新率</li>
+                    <li>可通过 <code>ThrowForceMultiplier</code> 微调投掷距离倍率，解决预测落点偏差</li>
+                    <li>使用正确的物理模型（带线性阻力的解析解），考虑手雷质量、玩家速度、力量技能和手耐力加成</li>
+                </ul>
+            </li>
+            <li><strong>温雷提示图标</strong>：温雷时在屏幕中心右侧显示闪烁图标，直观提示剩余爆炸时间
+                <ul class="sub-list">
+                    <li>图标位置为屏幕中心 + 可配置偏移（X/Y 像素），手雷在视角外也可见</li>
+                    <li>闪烁频率随剩余时间加快：正常阶段黄色慢闪，最后 2 秒变红快闪</li>
+                    <li>投掷瞬间图标围绕屏幕中心逆时针旋转 45°，0.5 秒后淡出消失</li>
+                    <li>程序化生成圆形 Sprite，无需外部资源依赖</li>
+                    <li>可在 F12 配置菜单开关（默认开启），支持自定义偏移、缩放和高度微调</li>
+                </ul>
+            </li>
+        </ul>
+    </div>
+
+    <div class="section">
+        <h3><span class="tag tag-fix">修复</span> 问题修复</h3>
+        <ul>
+            <li><strong>温雷（Cook）功能适配 SPT 4.1</strong>：
+                <ul class="sub-list">
+                    <li>原版本依赖 <code>Cook(float, bool)</code> 方法，4.1 中签名改为 <code>Cook()</code> 且不再被调用</li>
+                    <li>改为在 <code>Grenade.Init</code> 阶段检测温雷状态，通过 <code>ThrowWeap.GetExplDelay</code> 动态注入缩短后的引信时间</li>
+                    <li>修复了温雷投掷后人物无法操控、视角锁死的问题（去掉了会破坏输入链的 <code>SetActive(false)</code>）</li>
+                </ul>
+            </li>
+            <li><strong>保险丝静音功能恢复</strong>：4.1 中 <code>OnSoundAtPoint</code> 改为显式接口实现 <code>IEventsConsumer.OnSoundAtPoint</code>，通过接口映射正确找到目标方法</li>
+            <li><strong>抛物线起点错误</strong>：LineRenderer 改为 <code>useWorldSpace = true</code>，世界坐标直接绘制不再错乱</li>
+            <li><strong>抛物线不可见</strong>：线宽默认加粗 5 倍（起点 7.5cm / 终点 3.75cm），Shader 找不到时自动回退到 <code>Unlit/Color</code></li>
+            <li><strong>卡顿问题</strong>：
+                <ul class="sub-list">
+                    <li>去掉了每帧调用的所有反射（<code>GetValue</code>/<code>GetValues</code> 全部改为直接属性访问）</li>
+                    <li>去掉了高频 <code>AppDomain.GetAssemblies()</code> 全量扫描，HitMask 反射结果永久缓存</li>
+                    <li>弹道采样点从 200 个降至 80 个，间距 1m</li>
+                    <li>新增 <code>RecalcInterval</code> 帧间隔控制（默认每 2 帧重算 1 次）+ 投掷参数增量变化检测（位置&lt;5cm/力度不变时跳过重算）</li>
+                    <li>SphereCast 碰撞检测从逐点检测改为隔点检测（前半段偶数帧点，最后 10 点必检确保落点精度）</li>
+                </ul>
+            </li>
+        </ul>
+    </div>
+
+    <div class="section">
+        <h3><span class="tag tag-cfg">配置</span> 配置项新增</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>配置项</th>
+                    <th>默认值</th>
+                    <th>说明</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td><code>EnableTrajectoryRenderer</code></td><td><code>true</code></td><td>是否启用抛物线预测</td></tr>
+                <tr><td><code>TrajectoryColor</code></td><td>青色 (1,1,0,1)</td><td>轨迹线颜色（RGBA）</td></tr>
+                <tr><td><code>TrajectoryHitColor</code></td><td>红色 (1,0,0,1)</td><td>落点命中时的轨迹颜色</td></tr>
+                <tr><td><code>TrajectoryLineWidth</code></td><td><code>0.015</code></td><td>轨迹基础线宽（实际渲染 ×5）</td></tr>
+                <tr><td><code>TrajectorySegmentCount</code></td><td><code>80</code></td><td>轨迹采样点数</td></tr>
+                <tr><td><code>ThrowForceMultiplier</code></td><td><code>1.0</code></td><td>投掷力度倍率（&gt;1 扔得更远）</td></tr>
+                <tr><td><code>HitPointSphereRadius</code></td><td><code>0.1</code></td><td>落点提示球半径（米）</td></tr>
+                <tr><td><code>EnableCookIndicator</code></td><td><code>true</code></td><td>是否启用温雷提示图标</td></tr>
+                <tr><td><code>CookIndicatorHeight</code></td><td><code>0.3</code></td><td>图标 Y 轴微调基准高度（米），0.3m = 不补偿</td></tr>
+                <tr><td><code>CookIndicatorScale</code></td><td><code>0.15</code></td><td>图标缩放大小</td></tr>
+                <tr><td><code>CookIndicatorOffsetX</code></td><td><code>60</code></td><td>图标相对屏幕中心的水平偏移（像素，右正左负）</td></tr>
+                <tr><td><code>CookIndicatorOffsetY</code></td><td><code>0</code></td><td>图标相对屏幕中心的垂直偏移（像素，上正下负）</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="section">
+        <h3><span class="tag tag-compat">兼容</span> 兼容性</h3>
+        <ul>
+            <li>最低支持：SPTarkov 4.1.0 / BepInEx 5.x / .NET Framework 4.7.2</li>
+            <li>所有 Patch 启用失败时会捕获异常并输出日志，不会导致插件整体崩溃</li>
+            <li><code>GrenadeHandsControllerCookPatch</code> 保留旧签名兼容逻辑（优先 4.1，回退 3.x）</li>
+        </ul>
+    </div>
+
+</div>
+</body>
+</html>

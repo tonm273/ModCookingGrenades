@@ -1,0 +1,121 @@
+/* CookingGrenades 更新日志样式（透明背景，深色文字适配浅色论坛主题） */
+body {
+    background: transparent;
+    color: #1f2937;
+    font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+    line-height: 1.7;
+    margin: 0;
+    padding: 24px 16px;
+}
+
+.changelog {
+    max-width: 860px;
+    margin: 0 auto;
+    background: transparent;
+    border-left: 4px solid #d97706;
+    border-radius: 6px;
+    padding: 28px 36px;
+    box-shadow: none;
+}
+
+.changelog h1 {
+    color: #b45309;
+    border-bottom: 2px solid #d97706;
+    padding-bottom: 10px;
+    margin-top: 0;
+    font-size: 1.6em;
+}
+
+.changelog h2 {
+    color: #b45309;
+    border-left: 4px solid #d97706;
+    padding-left: 12px;
+    margin-top: 32px;
+    font-size: 1.35em;
+}
+
+.changelog h3 {
+    color: #92400e;
+    margin-top: 24px;
+    margin-bottom: 8px;
+    font-size: 1.1em;
+}
+
+.changelog ul {
+    padding-left: 24px;
+}
+
+.changelog li {
+    margin: 6px 0;
+}
+
+.changelog li > strong {
+    color: #b45309;
+}
+
+.changelog .sub-list {
+    margin-top: 4px;
+    margin-bottom: 8px;
+    color: #4b5563;
+    font-size: 0.95em;
+}
+
+.changelog table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0 20px 0;
+    background: transparent;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.changelog th {
+    background: transparent;
+    color: #b45309;
+    padding: 10px 12px;
+    text-align: left;
+    font-weight: 600;
+    border-bottom: 2px solid #d97706;
+}
+
+.changelog td {
+    padding: 8px 12px;
+    border-bottom: 1px solid #d1d5db;
+    vertical-align: top;
+}
+
+.changelog tr:last-child td {
+    border-bottom: none;
+}
+
+.changelog tr:hover td {
+    background: transparent;
+}
+
+.changelog code {
+    background: transparent;
+    color: #1e40af;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-family: "Consolas", "Courier New", monospace;
+    font-size: 0.92em;
+}
+
+.changelog .tag {
+    display: inline-block;
+    padding: 1px 8px;
+    border-radius: 10px;
+    font-size: 0.82em;
+    font-weight: 600;
+    margin-right: 6px;
+    vertical-align: middle;
+}
+
+.changelog .tag-new { background: #16a34a; color: #fff; }
+.changelog .tag-fix { background: #dc2626; color: #fff; }
+.changelog .tag-cfg { background: #2563eb; color: #fff; }
+.changelog .tag-compat { background: #7c3aed; color: #fff; }
+
+.changelog .section {
+    margin-bottom: 8px;
+}

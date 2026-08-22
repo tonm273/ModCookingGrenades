@@ -1,0 +1,9 @@
+# 构建产物
+bin/
+obj/
+*.user
+*.suo
+
+# Visual Studio / IDE
+.vs/
+.idea/
