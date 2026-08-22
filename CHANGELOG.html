@@ -10,6 +10,41 @@
 
     <h1>CookingGrenades 更新日志</h1>
 
+    <h2>版本 1.4.1 — 联机同步优化 &amp; 稳定性</h2>
+
+    <div class="section">
+        <h3><span class="tag tag-new">体积</span> 体积优化</h3>
+        <ul>
+            <li><strong>DLL 瘦身</strong>：移除未用于构建的 26 张手雷 <code>Grenades/*.png</code> 内嵌资源，DLL 体积从 3.81MB 降至 1.76MB（-54%），仅保留必要的温雷指示器图片</li>
+            <li><strong>死代码清理</strong>：删除无调用的 <code>ItemIconPreloader</code>、<code>ItemIconCache.TryGet</code>、<code>PreloadTemplatesAsync</code> 等冗余代码</li>
+        </ul>
+    </div>
+
+    <div class="section">
+        <h3><span class="tag tag-fix">修复</span> 问题修复</h3>
+        <ul>
+            <li><strong>抛物线移动抖动</strong>：修复人物移动时抛物线持续抖动的问题。加入移动速度判定——移动中使用实时重算保持平滑跟随，静止时才启用帧节流</li>
+            <li><strong>手雷轮盘本地化</strong>：取消硬编码手雷中文名称字典，改为与医药轮盘一致的使用 <code>Localized()</code> 游戏内本地化，中文/英文环境下显示自动切换，新增手雷无需改代码</li>
+        </ul>
+    </div>
+
+    <div class="section">
+        <h3><span class="tag tag-compat">同步</span> Fika 联机同步优化</h3>
+        <ul>
+            <li><strong>反射缓存</strong>：<code>GrenadePacket</code> 序列化/反序列化的 <code>Put</code>/<code>GetFloat</code> 反射查找结果缓存，避免高频热路径的重复反射开销</li>
+            <li><strong>线程安全</strong>：<code>NextCookTime</code>/<code>CurrentCookTime</code> 使用 <code>volatile</code>，保证跨线程可见性</li>
+            <li><strong>内存防护</strong>：接收端烹饪时长缓存改用 <code>ConditionalWeakTable</code>（弱引用键），包对象回收后同步清除，解决潜在字典泄漏</li>
+            <li><strong>多人隔离</strong>：烹饪时长改为按 Observed controller 实例绑定（<code>ObservedControllerCookStore</code>），取走即清，多名玩家同时温雷互不干扰</li>
+        </ul>
+    </div>
+
+    <div class="section">
+        <h3><span class="tag tag-cfg">配置</span> 配置界面</h3>
+        <ul>
+            <li>配置项默认值与提示文案与代码保持同步核对</li>
+        </ul>
+    </div>
+
     <h2>版本 1.2.1 — 温雷提示图标 &amp; SPT 4.1.0 适配</h2>
 
     <div class="section">

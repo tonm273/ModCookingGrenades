@@ -1,8 +1,8 @@
 # CookingGrenades — 温雷模组
 
-> **版本**: 1.2.1  
+> **版本**: 1.4.1  
 > **适用**: SPT 4.1.0 / BepInEx 5.x / .NET Framework 4.7.2  
-> **BEP插件ID**: `com.November75.CookingGrenades`
+> **BEP插件ID**: `com.Tangh.CookingGrenades`
 
 ---
 
@@ -86,12 +86,13 @@ CookingGrenades 为 SPT 添加了**手雷温雷（Cooking）**机制，让你可
 
 ### 8. 手雷轮盘（Grenade Wheel）
 
-按住 **G 键** 在屏幕中心打开一个**手雷轮盘**，直观地显示背包中所有手雷：
+按住默认的 **G 键**（可在 F12 配置中修改）在屏幕中心打开一个**手雷轮盘**，直观地显示背包中所有手雷：
 
-- **操作方式**：在战斗中按住 G 键 → 屏幕中心弹出轮盘 → 移动鼠标选择手雷 → 松开 G 键自动装备
+- **操作方式**：在战斗中按住按键 → 屏幕中心弹出轮盘 → 移动鼠标选择手雷 → 松键自动装备
 - **视觉反馈**：轮盘呈圆形排列，每个手雷用不同颜色区分类型，选中高亮为金黄色
 - **光标控制**：轮盘打开时会自动释放鼠标光标，方便精准选择；关闭后自动恢复锁定
 - **装备扫描**：自动扫描**战术弹挂**和**口袋**中的手雷；**背包**默认不扫描（可在 F12 配置中开启）
+- **设备行为**：可配置"选中后立即装备"与"手持时立即切换"，也可关闭它们改为仅设置偏好手雷（再按一次键掏出）
 - **安全保护**：温雷期间不会触发轮盘；轮盘打开期间无法开枪、瞄准、切换武器
 - **配置开关**：可在 F12 配置菜单中完全禁用（默认开启）
 
@@ -99,10 +100,10 @@ CookingGrenades 为 SPT 添加了**手雷温雷（Cooking）**机制，让你可
 
 复用**手雷轮盘**的轮盘 UI 效果，长按按键唤出**医药轮盘**，鼠标选择药品，松开即直接使用：
 
-- **操作方式**：按住 **H 键**（可在 F12 配置中修改）→ 屏幕中心弹出轮盘 → 移动鼠标选择药品 → 松开自动使用
+- **操作方式**：按住默认的 **H 键**（可在 F12 配置中修改）→ 屏幕中心弹出轮盘 → 移动鼠标选择药品 → 松开自动使用
 - **药品扫描**：
-  - 默认扫描**战术弹挂**与**口袋**中的药品；**背包**默认开启扫描（可在 F12 配置中关闭）
-  - **安全箱**（Kappa/Alpha 箱）内物品战局中不可取用，永远不会被扫描
+  - 默认扫描**战术弹挂**与**口袋**中的药品；**背包**默认不扫描（可在 F12 配置中开启）
+  - **安全箱**（Kappa/Alpha 箱）默认开启扫描（可在 F12 配置中关闭）
   - 食物与饮水默认一并显示（可在 F12 配置中关闭）
 - **药品分类配色**：急救包=绿色、药品/兴奋剂/止痛药=紫色、食物饮水=橙色、其他医疗用品（绷带/手术包等）=蓝色
 - **使用方式**：选择后直接走游戏原生用药流程（`Proceed`），医疗品与食物饮水均可直接使用
@@ -121,6 +122,7 @@ CookingGrenades 为 SPT 添加了**手雷温雷（Cooking）**机制，让你可
 | 配置项 | 类型 | 默认值 | 说明 |
 |--------|------|--------|------|
 | `Enable Cooking Notification` | bool | `false` | 开始温雷时显示通知消息 |
+| `Auto Throw Lead Time` | float | `0.8` | 距离引信爆炸剩余多少秒时强制投出（0.1 ~ 3，越大越早投出越安全） |
 | `Show Default Fuse Time In Inventory UI` | bool | `true` | 库存界面显示默认引信时间（而非随机值） |
 | `Use Alternative Pin Sound` | bool | `true` | 对特定手雷使用替代拔销音效 |
 
@@ -156,27 +158,30 @@ CookingGrenades 为 SPT 添加了**手雷温雷（Cooking）**机制，让你可
 | `Landing Point Color` | Color | `(1,0,0,0.9)` | 落点标记颜色（RGBA） |
 | `Landing Point Radius` | float | `0.3` | 落点标记半径（米，范围 0.05 ~ 2） |
 | `Trajectory Points` | int | `60` | 轨迹采样点数（10 ~ 200，越多越平滑但越耗性能） |
-| `Trajectory Step Time` | float | `0.03` | 采样步长时间（秒，范围 0.01 ~ 0.2） |
+| `Trajectory Step Size` | float | `0.5` | 相邻采样点水平间距（米，范围 0.1 ~ 2），越小越密集越平滑 |
 | `Trajectory Line Width` | float | `0.015` | 轨迹线宽（范围 0.005 ~ 0.1，实际渲染会放大） |
 | `Throw Force Multiplier` | float | `1.0` | 投掷力度倍率（0.5 ~ 3），预测落点不准时微调 |
+| `Recalc Interval (frames)` | int | `2` | 投掷参数不变时每 N 帧重算一次抛物线（1=每帧，越大越省性能但反应越慢） |
 
 ### 5. 温雷提示（Cook Indicator）
 
 | 配置项 | 类型 | 默认值 | 说明 |
 |--------|------|--------|------|
 | `Enable Cook Indicator` | bool | `true` | 启用温雷提示图标 |
-| `Indicator Height` | float | `0.3` | 图标在屏幕上方的基准高度（米，范围 0.1 ~ 2） |
+| `Indicator Height` | float | `1.0` | 图标在屏幕上方基准高度（米，范围 0.1 ~ 2） |
 | `Indicator Scale` | float | `0.15` | 图标缩放大小（范围 0.05 ~ 1） |
-| `Offset X (px)` | float | `60` | 屏幕中心水平偏移像素（-500 ~ 500，正=向右） |
+| `Offset X (px)` | float | `200` | 屏幕中心水平偏移像素（-500 ~ 500，正=向右） |
 | `Offset Y (px)` | float | `0` | 屏幕中心垂直偏移像素（-500 ~ 500，正=向上） |
-| `Throw Animation Duration (s)` | float | `1.5` | 扔雷时图标旋转淡出动画时长（秒，范围 0.1 ~ 5） |
+| `Throw Animation Duration (s)` | float | `2.5` | 扔雷时图标旋转淡出动画时长（秒，范围 0.1 ~ 5） |
 
 ### 6. 手雷轮盘（Grenade Wheel）
 
 | 配置项 | 类型 | 默认值 | 说明 |
 |--------|------|--------|------|
-| `Enable Grenade Wheel` | bool | `true` | 启用手雷轮盘选择器（按住 G 打开） |
-| `Scan Backpack For Grenades` | bool | `false` | 是否同时扫描背包中的手雷（默认只扫描战术弹挂和口袋） |
+| `Enable Grenade Wheel` | bool | `true` | 启用手雷轮盘选择器（按住按键打开） |
+| `Grenade Wheel Key` | KeyCode | `G` | 长按唤出到手雷轮盘的按键 |
+| `Equip Immediately On Select` | bool | `true` | 松键时立即装备选中的手雷；关闭则仅设为偏好手雷（需再按一次键掏出） |
+| `Switch Immediately When Holding` | bool | `true` | 若已手持手雷，选中不同手雷时立即切换；关闭则仅设置偏好不立即切换 |
 
 ### 7. 医药轮盘（Medicine Wheel）
 
@@ -184,7 +189,8 @@ CookingGrenades 为 SPT 添加了**手雷温雷（Cooking）**机制，让你可
 |--------|------|--------|------|
 | `Enable Medicine Wheel` | bool | `true` | 启用医药轮盘选择器（按住按键打开） |
 | `Medicine Wheel Key` | KeyCode | `H` | 长按唤出医药轮盘的按键 |
-| `Scan Backpack For Medicine` | bool | `false` | 是否扫描背包中的药品（安全箱永远不扫描） |
+| `Scan Secure Container For Medicine` | bool | `true` | 是否扫描安全箱中的药品 |
+| `Scan Backpack For Medicine` | bool | `false` | 是否扫描背包中的药品（默认只扫描口袋和战术弹挂） |
 | `Include Food And Drinks` | bool | `true` | 是否在医药轮盘中显示食物与饮水 |
 
 ---

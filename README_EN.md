@@ -1,6 +1,6 @@
 # CookingGrenades
 
-> **Version**: 1.4.0  
+> **Version**: 1.4.1  
 > **Compatibility**: SPT 4.1.0 / BepInEx 5.x / .NET Framework 4.7.2  
 > **BepInEx Plugin ID**: `com.Tangh.CookingGrenades`
 
@@ -97,8 +97,8 @@ Reuses the wheel UI, holding a key opens a **medicine wheel**, select, release t
 
 - **Usage**: hold **H** (rebindable in F12) → wheel pops up → select → release to use.
 - **Scanning**:
-  - Scans the **tactical rig** and **pockets** by default; the **backpack** is scanned by default (configurable).
-  - Items inside the **secure container** (Kappa/Alpha) can't be taken out in raid, so they are never scanned.
+  - Scans the **tactical rig** and **pockets** by default; the **backpack** is not scanned by default (configurable).
+  - The **secure container** (Kappa/Alpha) is scanned by default (configurable). Items in it are usable in raid as far as the mod is concerned, but the in-raid storage is restricted by the game.
   - Food and drinks shown by default (toggleable).
 - **Color coding**: medkits=green, meds/stims/painkillers=purple, food & drink=orange, other medical supplies (bandages/surgery kits/etc.)=blue.
 - **Usage**: uses the native `Proceed` flow, so both medical items and food/drinks can be used directly.
@@ -153,28 +153,30 @@ All settings are adjustable in the F12 config menu, grouped below.
 | `Landing Point Color` | Color | `(1,0,0,0.9)` | Landing marker color (RGBA). |
 | `Landing Point Radius` | float | `0.3` | Landing marker radius (m, 0.05 ~ 2). |
 | `Trajectory Points` | int | `60` | Sample points (10 ~ 200; more = smoother but heavier). |
-| `Trajectory Step Time` | float | `0.03` | Step time (s, 0.01 ~ 0.2). |
+| `Trajectory Step Size` | float | `0.5` | Horizontal distance (m) between sample points (0.1 ~ 2); smaller = denser = smoother. |
 | `Trajectory Line Width` | float | `0.015` | Line width (0.005 ~ 0.1; multiplied at render). |
 | `Throw Force Multiplier` | float | `1.0` | Force multiplier (0.5 ~ 3) to calibrate predicted vs. actual landing. |
+| `Recalc Interval (frames)` | int | `2` | Recalculate trajectory at most every N frames when throw params are unchanged (1 = every frame; higher = cheaper but less responsive). |
 
 ### 5. Cook Indicator
 
 | Setting | Type | Default | Description |
 |--------|------|--------|------|
 | `Enable Cook Indicator` | bool | `true` | Enable the cooking indicator icon. |
-| `Indicator Height` | float | `0.3` | Base height above screen center (m, 0.1 ~ 2). |
+| `Indicator Height` | float | `1.0` | Base height above screen center (m, 0.1 ~ 2). |
 | `Indicator Scale` | float | `0.15` | Icon scale (0.05 ~ 1). |
-| `Offset X (px)` | float | `60` | Horizontal offset from screen center (-500 ~ 500). |
+| `Offset X (px)` | float | `200` | Horizontal offset from screen center (-500 ~ 500). |
 | `Offset Y (px)` | float | `0` | Vertical offset from screen center (-500 ~ 500). |
-| `Throw Animation Duration (s)` | float | `1.5` | Rotate/fade-out animation duration on throw (s, 0.1 ~ 5). |
+| `Throw Animation Duration (s)` | float | `2.5` | Rotate/fade-out animation duration on throw (s, 0.1 ~ 5). |
 
 ### 6. Grenade Wheel
 
 | Setting | Type | Default | Description |
 |--------|------|--------|------|
-| `Enable Grenade Wheel` | bool | `true` | Enable the grenade wheel selector (hold G). |
+| `Enable Grenade Wheel` | bool | `true` | Enable the grenade wheel selector (hold key). |
 | `Grenade Wheel Key` | KeyCode | `G` | Key to hold to open the grenade wheel. |
-| `Scan Backpack For Grenades` | bool | `false` | Also scan the backpack (default: rig and pockets only). |
+| `Equip Immediately On Select` | bool | `true` | Equip the selected grenade immediately on release; if disabled, only sets it as preferred (press the key again to pull it out). |
+| `Switch Immediately When Holding` | bool | `true` | If you already hold a grenade, selecting a different one switches to it immediately; if disabled, only sets the preference. |
 
 ### 7. Medicine Wheel
 
@@ -182,8 +184,8 @@ All settings are adjustable in the F12 config menu, grouped below.
 |--------|------|--------|------|
 | `Enable Medicine Wheel` | bool | `true` | Enable the medicine wheel selector. |
 | `Medicine Wheel Key` | KeyCode | `H` | Key to hold to open the medicine wheel. |
-| `Scan Backpack For Medicine` | bool | `false` | Scan the backpack for medicine (secure container is never scanned). |
-| `Scan Secure Container` | bool | `false` | Also scan the secure container for medicine (off by default). |
+| `Scan Secure Container For Medicine` | bool | `true` | Also scan the secure container for medicine. |
+| `Scan Backpack For Medicine` | bool | `false` | Scan the backpack for medicine (default: pockets and tactical rig only). |
 | `Include Food And Drinks` | bool | `true` | Show food and drinks in the medicine wheel. |
 
 ---
