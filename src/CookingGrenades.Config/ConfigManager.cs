@@ -87,7 +87,7 @@ internal static class ConfigManager
 				Order = -1
 			}
 		}));
-		RealisticFuseTimeEnable = configFile.Bind<bool>("1. Realistic Fuse Time", "Realistic Fuse Time Enable", true, new ConfigDescription("", (AcceptableValueBase)null, new object[1]
+		RealisticFuseTimeEnable = configFile.Bind<bool>("1. Realistic Fuse Time", "Realistic Fuse Time Enable", false, new ConfigDescription("", (AcceptableValueBase)null, new object[1]
 		{
 			new ConfigurationManagerAttributes
 			{
@@ -221,7 +221,7 @@ internal static class ConfigManager
 		{
 			new ConfigurationManagerAttributes { Order = 9 }
 		}));
-		MedicineWheelScanSecure = configFile.Bind<bool>("7. Medicine Wheel", "Scan Secure Container For Medicine", true, new ConfigDescription("If enabled, the secure container is also scanned for medicine.", null, new object[1]
+		MedicineWheelScanSecure = configFile.Bind<bool>("7. Medicine Wheel", "Scan Secure Container For Medicine", false, new ConfigDescription("If enabled, the secure container is also scanned for medicine.", null, new object[1]
 		{
 			new ConfigurationManagerAttributes { Order = 8 }
 		}));

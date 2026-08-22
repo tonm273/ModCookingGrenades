@@ -125,7 +125,7 @@ All settings are adjustable in the F12 config menu, grouped below.
 
 | Setting | Type | Default | Description |
 |--------|------|--------|------|
-| `Realistic Fuse Time Enable` | bool | `true` | Enable randomized fuse times. |
+| `Realistic Fuse Time Enable` | bool | `false` | Enable randomized fuse times. |
 | `Fuse Time Spread Factor` | float | `0.085` | Spread (0.001 ~ 0.6); higher = wider variation. |
 
 ### 2. Fuse Time Tester
@@ -184,7 +184,7 @@ All settings are adjustable in the F12 config menu, grouped below.
 |--------|------|--------|------|
 | `Enable Medicine Wheel` | bool | `true` | Enable the medicine wheel selector. |
 | `Medicine Wheel Key` | KeyCode | `H` | Key to hold to open the medicine wheel. |
-| `Scan Secure Container For Medicine` | bool | `true` | Also scan the secure container for medicine. |
+| `Scan Secure Container For Medicine` | bool | `false` | Also scan the secure container for medicine. |
 | `Scan Backpack For Medicine` | bool | `false` | Scan the backpack for medicine (default: pockets and tactical rig only). |
 | `Include Food And Drinks` | bool | `true` | Show food and drinks in the medicine wheel. |
 

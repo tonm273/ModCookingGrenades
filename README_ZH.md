@@ -130,7 +130,7 @@ CookingGrenades 为 SPT 添加了**手雷温雷（Cooking）**机制，让你可
 
 | 配置项 | 类型 | 默认值 | 说明 |
 |--------|------|--------|------|
-| `Realistic Fuse Time Enable` | bool | `true` | 启用引信时间随机波动 |
+| `Realistic Fuse Time Enable` | bool | `false` | 启用引信时间随机波动 |
 | `Fuse Time Spread Factor` | float | `0.085` | 波动幅度（0.001 ~ 0.6），越大波动范围越宽 |
 
 ### 2. 引信时间模拟器（Realistic Fuse Iime Tester）
@@ -189,7 +189,7 @@ CookingGrenades 为 SPT 添加了**手雷温雷（Cooking）**机制，让你可
 |--------|------|--------|------|
 | `Enable Medicine Wheel` | bool | `true` | 启用医药轮盘选择器（按住按键打开） |
 | `Medicine Wheel Key` | KeyCode | `H` | 长按唤出医药轮盘的按键 |
-| `Scan Secure Container For Medicine` | bool | `true` | 是否扫描安全箱中的药品 |
+| `Scan Secure Container For Medicine` | bool | `false` | 是否扫描安全箱中的药品 |
 | `Scan Backpack For Medicine` | bool | `false` | 是否扫描背包中的药品（默认只扫描口袋和战术弹挂） |
 | `Include Food And Drinks` | bool | `true` | 是否在医药轮盘中显示食物与饮水 |
 
