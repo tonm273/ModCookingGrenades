@@ -1,5 +1,7 @@
-# 构建产物
-bin/
+# 构建产物（仅保留 Release dll）
+src/bin/Debug/
+src/bin/Release/*/
+!src/bin/Release/*.dll
 obj/
 *.user
 *.suo
