@@ -26,13 +26,8 @@ public class GrenadeWheelInputPatch : ModulePatch
 	[PatchPrefix]
 	public static bool PatchPrefix(EftGamePlayerOwner __instance, ECommand command, ref object __result)
 	{
-		var wheel = GrenadeWheel.Instance;
-		if (wheel == null)
-		{
-			var wheelObj = new GameObject("GrenadeWheel");
-			Object.DontDestroyOnLoad(wheelObj);
-			wheel = wheelObj.AddComponent<GrenadeWheel>();
-		}
+		// 单例若被销毁（异常）则自动重建（WheelBase 统一入口，避免重复创建逻辑）
+		var wheel = WheelBase<GrenadeWheel>.GetOrCreateInstance<GrenadeWheel>();
 
 		// 轮盘禁用时放行所有输入，让游戏原生处理
 		if (!ConfigManager.EnableGrenadeWheel.Value)
@@ -45,14 +40,9 @@ public class GrenadeWheelInputPatch : ModulePatch
 			return false;
 		}
 
-		// 阻止游戏原生的 G 键选雷功能（避免与 Unity Input 检测冲突）。
-		// 仅当轮盘触发键就是 G 时拦截，避免用户改键（如改成其他键）后原生 G 键也一并失效。
-		if ((int)command == 60 && ConfigManager.GrenadeWheelKey.Value == KeyCode.G)
-		{
-			__result = BlockedResult;
-			return false;
-		}
-
+		// 注意：此处不应拦截 ThrowGrenade(13) / PressThrowGrenade(14) / ReloadWeapon(15) 等命令，
+		// 否则会破坏"点按 G 直接投雷"与"换弹"功能。屏蔽原生手雷选择栏统一交给
+		// GrenadeSelectorPatch（拦截 GrenadeSelector.ShowGrenades 阻止 UI 显示），投雷/换弹命令保持放行。
 		return true;
 	}
 }

@@ -28,13 +28,8 @@ public class MedicineWheelInputPatch : ModulePatch
 	[PatchPrefix]
 	public static bool PatchPrefix(EftGamePlayerOwner __instance, ECommand command, ref object __result)
 	{
-		var wheel = MedicineWheel.Instance;
-		if (wheel == null)
-		{
-			var wheelObj = new GameObject("MedicineWheel");
-			Object.DontDestroyOnLoad(wheelObj);
-			wheel = wheelObj.AddComponent<MedicineWheel>();
-		}
+		// 单例若被销毁（异常）则自动重建（WheelBase 统一入口，避免重复创建逻辑）
+		var wheel = WheelBase<MedicineWheel>.GetOrCreateInstance<MedicineWheel>();
 
 		// 轮盘禁用时放行所有输入，让游戏原生处理
 		if (!ConfigManager.EnableMedicineWheel.Value)

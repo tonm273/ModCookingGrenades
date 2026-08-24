@@ -70,6 +70,13 @@ public class GrenadeInitPatch : ModulePatch
 			}
 		}
 
+		// 每次实际投掷的手雷，同步记录为偏好模板：即使某类投完、直接用 G 连投下一类，
+		// SetNewTopPriorityGrenadePatch 也能锁定"正在投的这一类"剩余手雷，而非陈旧的轮盘选择。
+		if (throwWeap != null)
+		{
+			GrenadeWheel.PreferredTemplateId = throwWeap.StringTemplateId;
+		}
+
 		GrenadeCookingTimer cookingTimer = GrenadeCookingManager.GetCookingTimer();
 
 		if (cookingTimer.IsCooking && throwWeap != null)
@@ -104,6 +111,9 @@ public class GrenadeInitPatch : ModulePatch
 	[PatchPostfix]
 	public static void PatchPostfix(Grenade __instance, object[] __args, MethodBase __originalMethod)
 	{
+		// _timeSpent 字段在 4.1 反混淆后名称可能变化；找不到时跳过，避免 NullReferenceException 影响投雷
+		if (ImpactFuseTimeField == null) return;
+
 		ParameterInfo[] ps = __originalMethod.GetParameters();
 		for (int i = 0; i < ps.Length && i < __args.Length; i++)
 		{

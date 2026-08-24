@@ -23,6 +23,9 @@ public class ThrowWeapGetExplDelayPatch : ModulePatch
 	// 相比原先 Dictionary<WeakReference>, 消除了"失效条目永不清理"的无界增长，
 	// 也省去了每次查询 new WeakReference 产生的分配。
 	// 注意 ConditionalWeakTable 的 TValue 也必须是引用类型，因此用 DelayRef 包装 float。
+	// 独立锁对象：ResetExplDelay 会替换 _explDelay 表引用，若直接 lock 字段引用，
+	// 替换后其他线程会锁到旧表（相互不互斥）→ 竞态。所有读写统一锁该对象。
+	private static readonly object _explDelayLock = new object();
 	private static ConditionalWeakTable<ThrowWeap, DelayRef> _explDelay = new ConditionalWeakTable<ThrowWeap, DelayRef>();
 
 	private sealed class DelayRef
@@ -48,7 +51,7 @@ public class ThrowWeapGetExplDelayPatch : ModulePatch
 	/// </summary>
 	public static void ResetExplDelay()
 	{
-		lock (_explDelay)
+		lock (_explDelayLock)
 		{
 			_explDelay = new ConditionalWeakTable<ThrowWeap, DelayRef>();
 		}
@@ -59,7 +62,7 @@ public class ThrowWeapGetExplDelayPatch : ModulePatch
 	/// </summary>
 	public static void SetExplDelay(ThrowWeap throwWeap, float delay)
 	{
-		lock (_explDelay)
+		lock (_explDelayLock)
 		{
 			_explDelay.Remove(throwWeap);
 			_explDelay.Add(throwWeap, new DelayRef { Value = delay });
@@ -75,10 +78,13 @@ public class ThrowWeapGetExplDelayPatch : ModulePatch
 	public static void PatchPostfix(ThrowWeap __instance, ref float __result)
 	{
 		// 先检查是否有温雷注入的值（最高优先级）
-		if (_explDelay.TryGetValue(__instance, out var delayRef))
+		lock (_explDelayLock)
 		{
-			__result = delayRef.Value;
-			return;
+			if (_explDelay.TryGetValue(__instance, out var delayRef))
+			{
+				__result = delayRef.Value;
+				return;
+			}
 		}
 
 		if (!ConfigManager.RealisticFuseTimeEnable.Value)
@@ -93,7 +99,7 @@ public class ThrowWeapGetExplDelayPatch : ModulePatch
 		}
 
 		float num = MathUtils.GenerateNormalRandomBoxMuller(__result, __result * ConfigManager.FuseTimeSpreadFactor.Value);
-		lock (_explDelay)
+		lock (_explDelayLock)
 		{
 			_explDelay.Remove(__instance);
 			_explDelay.Add(__instance, new DelayRef { Value = num });

@@ -1,6 +1,6 @@
 # CookingGrenades
 
-> **Version**: 1.4.1  
+> **Version**: 1.4.2  
 > **Compatibility**: SPT 4.1.0 / BepInEx 5.x / .NET Framework 4.7.2  
 > **BepInEx Plugin ID**: `com.Tangh.CookingGrenades`
 

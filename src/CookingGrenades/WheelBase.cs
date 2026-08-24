@@ -35,6 +35,8 @@ public abstract class WheelBase<T> : MonoBehaviour where T : WheelBase<T>
     private float _raidStartTime = -1f;
     private float _keyHoldStartTime = -1f;
     private bool _keyWasHeld = false;
+    private bool _wheelSelectionLock = false;
+    private TMPro.TextMeshProUGUI _cancelLabel;
 
     private const float CenterDeadZone = 35f;
     private const float RaidDelay = 3f;
@@ -62,6 +64,19 @@ public abstract class WheelBase<T> : MonoBehaviour where T : WheelBase<T>
         }
         catch { }
         return "None";
+    }
+
+    /// <summary>
+    /// 获取子类单例；若已被销毁（异常情况）则自动重建（防御性自愈）。
+    /// 供输入补丁等早于轮盘初始化就访问 Instance 的位置复用，避免各处重复"创建 GameObject + AddComponent"逻辑。
+    /// </summary>
+    public static TW GetOrCreateInstance<TW>() where TW : WheelBase<TW>
+    {
+        if (WheelBase<TW>.Instance != null)
+            return WheelBase<TW>.Instance;
+        var obj = new GameObject(typeof(TW).Name);
+        DontDestroyOnLoad(obj);
+        return obj.AddComponent<TW>();
     }
 
     // ── 子类差异扩展点 ──────────────────────────────────────────
@@ -98,6 +113,12 @@ public abstract class WheelBase<T> : MonoBehaviour where T : WheelBase<T>
 
     /// <summary>选中确认后的行为（装备手雷 / 使用药品）</summary>
     protected abstract void OnSelect(int index);
+
+    /// <summary>
+    /// 打开轮盘时初始选中的槽位（-1 表示不预选）。
+    /// 手雷轮盘返回当前偏好/持用手雷对应的槽位，以实现打开瞬间与原版手雷栏高亮一致；医药返回 -1。
+    /// </summary>
+    protected virtual int GetInitialSelectedIndex() => -1;
 
     // ── 生命周期 ────────────────────────────────────────────────
 
@@ -231,7 +252,19 @@ public abstract class WheelBase<T> : MonoBehaviour where T : WheelBase<T>
 
         IsOpen = true;
         _selectedIndex = -1;
+        _wheelSelectionLock = false;
         CreateWheelUI();
+
+        // 初始选中当前偏好的手雷，使模组圆环高亮与原版手雷栏当前选择一致（打开瞬间）
+        int initIdx = GetInitialSelectedIndex();
+        if (initIdx >= 0 && initIdx < DisplayCount)
+        {
+            _selectedIndex = initIdx;
+            float slotAngleSize = 360f / (DisplayCount + 1);
+            _targetRotZ = _currentRotZ = -slotAngleSize * initIdx;
+            _wheelSelectionLock = true; // 保持初始选择，直到鼠标/滚轮接管
+            Plugin.log.LogInfo($"[{WheelLogName}] 初始选中当前手雷: {GetSlotName(initIdx)}");
+        }
         Plugin.log.LogInfo($"[{WheelLogName}] 轮盘已开启 ({DisplayCount} 种)");
     }
 
@@ -288,6 +321,9 @@ public abstract class WheelBase<T> : MonoBehaviour where T : WheelBase<T>
 
         if (count == 0) return;
 
+        // 扇区比手雷多一格：末尾一格为原版手雷栏的"✕ 取消"
+        int sectorCount = count + 1;
+
         float scale = RingDisplaySize / RingTexSize;
 
         // 1. 白色圆环
@@ -308,7 +344,7 @@ public abstract class WheelBase<T> : MonoBehaviour where T : WheelBase<T>
         var divTex = CreateSingleDividerTexture(RingTexSize, DividerInnerR, DividerOuterR, 2f);
         var divSprite = Sprite.Create(divTex, new Rect(0, 0, RingTexSize, RingTexSize), new Vector2(0.5f, 0.5f));
         _dividerObjects.Clear();
-        for (int i = 0; i < count; i++)
+        for (int i = 0; i < sectorCount; i++)
         {
             var divObj = new GameObject($"Divider_{i}");
             divObj.transform.SetParent(canvasObj.transform, false);
@@ -321,7 +357,7 @@ public abstract class WheelBase<T> : MonoBehaviour where T : WheelBase<T>
             divRect.anchoredPosition = Vector2.zero;
             divRect.sizeDelta = new Vector2(RingDisplaySize, RingDisplaySize);
             // 分隔线 i 位于槽位 i 和 i+1 之间
-            float dividerAngle = 90f - (360f / count) * (i + 0.5f);
+            float dividerAngle = 90f - (360f / sectorCount) * (i + 0.5f);
             float rotZ = dividerAngle - 90f;
             divRect.localRotation = Quaternion.Euler(0, 0, rotZ);
             divObj.SetActive(false);
@@ -329,7 +365,7 @@ public abstract class WheelBase<T> : MonoBehaviour where T : WheelBase<T>
         }
 
         // 3. 扇形区域高亮（覆盖选中槽位的整个图标区域，淡灰色由内向外渐浅至透明）
-        float sectorArcDeg = 360f / count;
+        float sectorArcDeg = 360f / sectorCount;
         float sectorInnerR = CircleOuterR - 2f;
         float sectorOuterR = DividerOuterR + 40f;
         var secTex = CreateSectorHighlightTexture(RingTexSize, sectorInnerR, sectorOuterR, sectorArcDeg);
@@ -348,7 +384,7 @@ public abstract class WheelBase<T> : MonoBehaviour where T : WheelBase<T>
         _sectorHighlightObj.SetActive(false);
 
         // 4. 高亮弧段（可旋转，贴圆环内壁滑动）
-        float hlArcDeg = (360f / count) * 0.75f;
+        float hlArcDeg = (360f / sectorCount) * 0.75f;
         var hlTex = CreateHighlightArcTexture(RingTexSize, CircleInnerR - 10f, CircleInnerR - 3f, hlArcDeg);
         var hlSprite = Sprite.Create(hlTex, new Rect(0, 0, RingTexSize, RingTexSize), new Vector2(0.5f, 0.5f));
         var hlObj = new GameObject("Highlight");
@@ -368,7 +404,7 @@ public abstract class WheelBase<T> : MonoBehaviour where T : WheelBase<T>
         float textRadius = ((CircleOuterR + DividerOuterR) / 2f) * scale;
         for (int i = 0; i < count; i++)
         {
-            float angleDeg = 90f - (360f / count) * i;
+            float angleDeg = 90f - (360f / sectorCount) * i;
             float angleRad = angleDeg * Mathf.Deg2Rad;
             Vector2 pos = new Vector2(
                 Mathf.Cos(angleRad) * textRadius,
@@ -421,6 +457,28 @@ public abstract class WheelBase<T> : MonoBehaviour where T : WheelBase<T>
             LoadSlotIcon(i, iconImage, nameText);
         }
 
+        // 6. 末尾一格：原版手雷栏的"✕ 取消"小图标
+        {
+            float cancelAngleDeg = 90f - (360f / sectorCount) * count;
+            float cancelAngleRad = cancelAngleDeg * Mathf.Deg2Rad;
+            Vector2 cancelPos = new Vector2(
+                Mathf.Cos(cancelAngleRad) * textRadius,
+                Mathf.Sin(cancelAngleRad) * textRadius);
+            var cancelObj = new GameObject("Cancel_Icon");
+            cancelObj.transform.SetParent(canvasObj.transform, false);
+            _cancelLabel = cancelObj.AddComponent<TMPro.TextMeshProUGUI>();
+            _cancelLabel.text = "\u2715";   // ✕ 取消图标
+            _cancelLabel.fontSize = 40;
+            _cancelLabel.fontStyle = TMPro.FontStyles.Bold;
+            _cancelLabel.alignment = TMPro.TextAlignmentOptions.Center;
+            _cancelLabel.color = new Color(0.6f, 0.6f, 0.6f);
+            _cancelLabel.raycastTarget = false;
+            var cancelRect = cancelObj.GetComponent<RectTransform>();
+            cancelRect.anchorMin = cancelRect.anchorMax = new Vector2(0.5f, 0.5f);
+            cancelRect.anchoredPosition = cancelPos;
+            cancelRect.sizeDelta = new Vector2(60, 60);
+        }
+
         _currentRotZ = 0f;
         _targetRotZ = 0f;
         _sectorCurrentRotZ = 0f;
@@ -435,6 +493,7 @@ public abstract class WheelBase<T> : MonoBehaviour where T : WheelBase<T>
             _canvas = null;
         }
         _centerLabel = null;
+        _cancelLabel = null;
         _highlightObj = null;
         _sectorHighlightObj = null;
         _slotGraphics.Clear();
@@ -451,17 +510,96 @@ public abstract class WheelBase<T> : MonoBehaviour where T : WheelBase<T>
         Vector2 screenCenter = new Vector2(Screen.width * 0.5f, Screen.height * 0.5f);
         Vector2 dir = mousePos - screenCenter;
 
-        int count = DisplayCount;
-        float slotAngleSize = 360f / count;
+        int grenadeCount = DisplayCount;
+        if (grenadeCount <= 0) return;
+
+        // 扇区总数 = 手雷数 + 1，末尾一格为原版手雷栏的"✕ 取消"
+        int sectorCount = grenadeCount + 1;
+        float slotAngleSize = 360f / sectorCount;
         float halfSlotAngle = slotAngleSize * 0.5f;
+        bool atCenter = dir.magnitude < CenterDeadZone;
 
-        if (dir.magnitude < CenterDeadZone)
+        // ---- 鼠标滚轮选择（方向：向上滚选"上一个"，向下滚选"下一个"）----
+        // 滚轮在整个扇区（含末尾"✕ 取消"格）间循环，可滚到取消格
+        float scroll = Input.mouseScrollDelta.y;
+        bool scrolling = Mathf.Abs(scroll) > 0f && grenadeCount > 0;
+        if (scrolling)
         {
-            if (_highlightObj != null)
-                _highlightObj.SetActive(false);
-            if (_sectorHighlightObj != null)
-                _sectorHighlightObj.SetActive(false);
+            int step = scroll > 0f ? -1 : 1;   // 修正滚轮方向
+            int cur = _selectedIndex;
+            if (cur < 0)                        // 未选中 → 先落入相邻手雷
+                cur = step > 0 ? grenadeCount - 1 : 0;
+            else
+                cur = ((cur + step) % sectorCount + sectorCount) % sectorCount;
+            _selectedIndex = cur;
+            _targetRotZ = -slotAngleSize * cur;
+            UpdateCancelVisual(cur >= grenadeCount);
+            _wheelSelectionLock = true;
+        }
 
+        // 滚轮锁定期间：鼠标移到不同扇区时交还鼠标控制
+        if (_wheelSelectionLock && !atCenter && !scrolling)
+        {
+            float mAngle = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
+            if (mAngle < 0) mAngle += 360;
+            int mouseSector = Mathf.RoundToInt((90f - mAngle) / slotAngleSize);
+            mouseSector = ((mouseSector % sectorCount) + sectorCount) % sectorCount;
+            if (mouseSector != _selectedIndex)
+                _wheelSelectionLock = false;
+        }
+
+        // 鼠标停在中央 → 无选中
+        if (atCenter && !_wheelSelectionLock)
+        {
+            _selectedIndex = -1;
+            UpdateCancelVisual(false);
+            ShowNoSelectionVisuals();
+            return;
+        }
+
+        // 当前指向的扇区（滚轮锁定时取锁定值）
+        int sectorIdx;
+        if (_wheelSelectionLock)
+        {
+            sectorIdx = _selectedIndex;
+        }
+        else
+        {
+            float mouseAngle = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
+            if (mouseAngle < 0) mouseAngle += 360;
+            sectorIdx = Mathf.RoundToInt((90f - mouseAngle) / slotAngleSize);
+            sectorIdx = ((sectorIdx % sectorCount) + sectorCount) % sectorCount;
+        }
+
+        // 指向末尾"✕ 取消"格。
+        // 保留取消格索引（=grenadeCount），使滚轮能在取消格停留并继续循环；
+        // 否则每次滚到取消格都被 ShowNoSelectionVisuals 拉回 -1，导致无法从取消格接着滚。
+        // 松开 G 时因索引越界不触发 OnSelect，等价"取消不投雷"；鼠标扫到取消格效果相同。
+        if (sectorIdx >= grenadeCount)
+        {
+            _selectedIndex = sectorIdx;
+            UpdateCancelVisual(true);
+
+            // 弧度/扇形与手雷槽位保持一致的"选中"高亮并跟随到取消格角度
+            if (!_wheelSelectionLock)
+            {
+                _targetRotZ = -slotAngleSize * sectorIdx;
+            }
+            _currentRotZ = Mathf.LerpAngle(_currentRotZ, _targetRotZ, Time.deltaTime * HighlightSmoothing);
+            if (_highlightObj != null)
+            {
+                if (!_highlightObj.activeSelf) _highlightObj.SetActive(true);
+                _highlightObj.transform.localRotation = Quaternion.Euler(0, 0, _currentRotZ);
+            }
+            _sectorTargetRotZ = -slotAngleSize * sectorIdx;
+            _sectorCurrentRotZ = Mathf.LerpAngle(_sectorCurrentRotZ, _sectorTargetRotZ, Time.deltaTime * HighlightSmoothing);
+            if (_sectorHighlightObj != null)
+            {
+                if (!_sectorHighlightObj.activeSelf) _sectorHighlightObj.SetActive(true);
+                _sectorHighlightObj.transform.localRotation = Quaternion.Euler(0, 0, _sectorCurrentRotZ);
+            }
+
+            // 取消格无手雷图标：其它槽位图标复位、所有分隔线隐藏、中心保留"无"
             for (int i = 0; i < _slotGraphics.Count; i++)
             {
                 if (_slotGraphics[i] != null)
@@ -470,29 +608,30 @@ public abstract class WheelBase<T> : MonoBehaviour where T : WheelBase<T>
                     _slotGraphics[i].rectTransform.localScale = Vector3.one;
                 }
             }
-
-            // 隐藏所有分隔线
             for (int i = 0; i < _dividerObjects.Count; i++)
             {
                 if (_dividerObjects[i].activeSelf)
                     _dividerObjects[i].SetActive(false);
             }
-
             if (_centerLabel != null)
             {
                 _centerLabel.text = GetNoSelectionText();
                 _centerLabel.color = new Color(1, 1, 1, 0.6f);
             }
-            _selectedIndex = -1;
             return;
         }
+        _selectedIndex = sectorIdx;
+        UpdateCancelVisual(false);
 
-        // 计算目标旋转角度（Z旋转 = mouseAngle - 90）
-        float mouseAngle = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
-        if (mouseAngle < 0) mouseAngle += 360;
-        _targetRotZ = mouseAngle - 90f;
+        // 计算目标旋转角度（Z旋转 = mouseAngle - 90）；滚轮锁定时沿用滚轮设置的目标角
+        if (!_wheelSelectionLock)
+        {
+            float mouseAngle = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
+            if (mouseAngle < 0) mouseAngle += 360;
+            _targetRotZ = mouseAngle - 90f;
+        }
 
-        // 平滑插值（弧段滑块：跟随鼠标）
+        // 平滑插值（弧段滑块：跟随鼠标/滚轮目标）
         _currentRotZ = Mathf.LerpAngle(_currentRotZ, _targetRotZ, Time.deltaTime * HighlightSmoothing);
 
         // 旋转高亮弧段
@@ -502,13 +641,6 @@ public abstract class WheelBase<T> : MonoBehaviour where T : WheelBase<T>
                 _highlightObj.SetActive(true);
             _highlightObj.transform.localRotation = Quaternion.Euler(0, 0, _currentRotZ);
         }
-
-        // 计算选中索引
-        float currentMathAngle = _currentRotZ + 90f;
-        float selFloat = (90f - currentMathAngle) / slotAngleSize;
-        int newSel = Mathf.RoundToInt(selFloat);
-        newSel = ((newSel % count) + count) % count;
-        _selectedIndex = newSel;
 
         // 扇形高亮目标角度：对齐到选中槽位的中心
         _sectorTargetRotZ = -slotAngleSize * _selectedIndex;
@@ -522,7 +654,7 @@ public abstract class WheelBase<T> : MonoBehaviour where T : WheelBase<T>
 
         // 更新图标/文字颜色和缩放（基于与高亮的角度距离，平滑过渡）。
         // _slotGraphics 每槽存 2 个元素（i*2=图标、i*2+1=回退文字），角度必须按槽位索引 i 计算。
-        for (int i = 0; i < count; i++)
+        for (int i = 0; i < grenadeCount; i++)
         {
             float slotRotZ = -slotAngleSize * i;
             float angleDist = Mathf.Abs(Mathf.DeltaAngle(slotRotZ, _currentRotZ));
@@ -544,23 +676,79 @@ public abstract class WheelBase<T> : MonoBehaviour where T : WheelBase<T>
             }
         }
 
-        // 仅显示选中槽位两侧的分隔线
+        // 仅显示选中手雷槽位两侧的分隔线（其余隐藏，含取消格两侧）
         for (int i = 0; i < _dividerObjects.Count; i++)
         {
-            bool shouldShow = (i == _selectedIndex) || (i == ((_selectedIndex - 1 + count) % count));
+            bool shouldShow = _selectedIndex >= 0 && _selectedIndex < grenadeCount &&
+                              (i == _selectedIndex || i == ((_selectedIndex - 1 + sectorCount) % sectorCount));
             if (_dividerObjects[i].activeSelf != shouldShow)
                 _dividerObjects[i].SetActive(shouldShow);
         }
 
-        // 中心文字
-        if (_centerLabel != null && _selectedIndex >= 0)
+        // 中心文字：选中手雷时显示全名，否则"无"
+        if (_centerLabel != null)
         {
-            _centerLabel.text = GetSlotFullName(_selectedIndex);
-            _centerLabel.color = Color.white;
+            if (_selectedIndex >= 0 && _selectedIndex < grenadeCount)
+            {
+                _centerLabel.text = GetSlotFullName(_selectedIndex);
+                _centerLabel.color = Color.white;
+            }
+            else
+            {
+                _centerLabel.text = GetNoSelectionText();
+                _centerLabel.color = new Color(1, 1, 1, 0.6f);
+            }
+        }
+    }
+
+    /// <summary>更新"✕ 取消"徽标的视觉：active 时红色放大，否则灰色。</summary>
+    private void UpdateCancelVisual(bool active)
+    {
+        if (_cancelLabel == null) return;
+        if (active)
+        {
+            _cancelLabel.color = new Color(1, 0.3f, 0.3f, 1f);
+            _cancelLabel.rectTransform.localScale = Vector3.one * 1.25f;
+        }
+        else
+        {
+            _cancelLabel.color = new Color(0.6f, 0.6f, 0.6f);
+            _cancelLabel.rectTransform.localScale = Vector3.one;
         }
     }
 
     // ── 程序化纹理生成 ─────────────────────────────────────────
+
+    /// <summary>恢复"无选中"UI 状态（隐藏高亮、复位图标文字、清空选中索引）。</summary>
+    private void ShowNoSelectionVisuals()
+    {
+        if (_highlightObj != null)
+            _highlightObj.SetActive(false);
+        if (_sectorHighlightObj != null)
+            _sectorHighlightObj.SetActive(false);
+
+        for (int i = 0; i < _slotGraphics.Count; i++)
+        {
+            if (_slotGraphics[i] != null)
+            {
+                _slotGraphics[i].color = new Color(0.6f, 0.6f, 0.6f);
+                _slotGraphics[i].rectTransform.localScale = Vector3.one;
+            }
+        }
+
+        for (int i = 0; i < _dividerObjects.Count; i++)
+        {
+            if (_dividerObjects[i].activeSelf)
+                _dividerObjects[i].SetActive(false);
+        }
+
+        if (_centerLabel != null)
+        {
+            _centerLabel.text = GetNoSelectionText();
+            _centerLabel.color = new Color(1, 1, 1, 0.6f);
+        }
+        _selectedIndex = -1;
+    }
 
     private Texture2D CreateCircleRingTexture(int texSize, float innerR, float outerR)
     {

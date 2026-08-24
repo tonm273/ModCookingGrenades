@@ -12,6 +12,13 @@ namespace CookingGrenades;
 
 public class GrenadeWheel : WheelBase<GrenadeWheel>
 {
+    /// <summary>
+    /// 用户最近一次在轮盘选中的手雷模板（TemplateId）。
+    /// 用于在原生 SetNewTopPriorityGrenade 把 TopPriorityGrenade 重置为其他类型时，
+    /// 把偏好重新指回同一模板的剩余手雷，避免"投完第一种后又换雷"反复开轮盘。
+    /// </summary>
+    public static string PreferredTemplateId;
+
     private class GroupedGrenade
     {
         public string TemplateId;
@@ -51,6 +58,36 @@ public class GrenadeWheel : WheelBase<GrenadeWheel>
     }
 
     protected override void OnSelect(int index) => EquipGrenade(_displayedGrenades[index]);
+
+    /// <summary>
+    /// 打开轮盘时的初始选中：优先当前偏好手雷（TopPriorityGrenade），找不到则 -1。
+    /// 先按实例引用匹配，再按模板 ID 匹配（偏好手雷可能是同模板的另一实例），
+    /// 使模组圆环初始高亮与原版手雷栏当前选择的偏好一致。
+    /// </summary>
+    protected override int GetInitialSelectedIndex()
+    {
+        try
+        {
+            var equipment = _player?.InventoryController?.Inventory?.Equipment;
+            if (equipment == null) return -1;
+            var top = equipment.TopPriorityGrenade;
+            if (top == null) return -1;
+            var topTemplate = top.StringTemplateId;
+            for (int i = 0; i < _displayedGrenades.Count; i++)
+            {
+                var dg = _displayedGrenades[i];
+                if (ReferenceEquals(dg.FirstItem, top))
+                    return i;
+                if (!string.IsNullOrEmpty(topTemplate) && dg.TemplateId == topTemplate)
+                    return i;
+            }
+        }
+        catch (Exception e)
+        {
+            Plugin.log.LogWarning($"[GrenadeWheel] 读取偏好手雷失败: {e.Message}");
+        }
+        return -1;
+    }
 
     protected override void ScanItems()
     {
@@ -138,6 +175,9 @@ public class GrenadeWheel : WheelBase<GrenadeWheel>
 
         try
         {
+            // 记录用户选中的手雷模板，供 SetNewTopPriorityGrenadePatch 在投雷后被原生重置偏好时重新锁定
+            PreferredTemplateId = group.TemplateId;
+
             // 始终设置 TopPriorityGrenade 偏好，让原版 G 键也能切到选中的手雷
             var equipment = _player.InventoryController?.Inventory?.Equipment;
             if (equipment != null)

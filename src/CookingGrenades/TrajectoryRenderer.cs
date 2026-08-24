@@ -12,11 +12,29 @@ namespace CookingGrenades;
 public class TrajectoryRenderer : MonoBehaviour
 {
     private LineRenderer _line;
-    private GameObject _landingSphere;
+    private LineRenderer _landingRing;      // 落点圆环（贴合地面法线）
+    private Transform _landingRingRoot;     // 圆环对齐法线的根节点
+    private GameObject _landingCenterObj;   // 落点中心小点
+    private Renderer _landingCenterRenderer;
+    private Material _ringMaterial;
+    private float _ringAnimT = -1f;         // 落点淡入/缩放动画时间（<0 表示不可见）
+    private Vector3 _lastRingNormal = Vector3.up;
     private GameWorld _cachedGameWorld;
-    private Renderer _sphereRenderer;
     private Vector3[] _positions;
     private Vector3 _playerVelocity;
+
+    // 圆环单位圆采样点（半径1，绕 Y 轴），生成一次复用
+    private static readonly Vector3[] _ringPoints = GenerateRingPoints(48);
+    private static Vector3[] GenerateRingPoints(int segs)
+    {
+        var pts = new Vector3[segs];
+        for (var i = 0; i < segs; i++)
+        {
+            var a = (i / (float)segs) * Mathf.PI * 2f;
+            pts[i] = new Vector3(Mathf.Sin(a), 0f, Mathf.Cos(a));
+        }
+        return pts;
+    }
 
     private float _mass = 0.55f;
     private string _itemName;
@@ -43,6 +61,11 @@ public class TrajectoryRenderer : MonoBehaviour
     private const float RecalcMoveSqr = 0.06f * 0.06f;   // 位置位移阈值：6cm
     private const float RecalcVelSqr = 0.08f * 0.08f;   // 初速变化阈值：8cm/s
 
+    // 渐变缓存：仅当起点/末端颜色配置变化时才重建 Gradient（避免每帧 new Gradient+数组 造成 GC 压力）
+    private Color _lastGradStart;
+    private Color _lastGradEnd;
+    private bool _gradientDirty = true;
+
     private void Start()
     {
         _gravity = -Physics.gravity.y;
@@ -65,24 +88,93 @@ public class TrajectoryRenderer : MonoBehaviour
         _line.material = new Material(shader);
         _line.numCapVertices = 1;
         _line.numCornerVertices = 2;
-        _line.startColor = ConfigManager.TrajectoryColor.Value;
-        _line.endColor = ConfigManager.LandingPointColor.Value;
-        // 线宽放大：配置值 * 5（默认0.015太细，调到0.075米/7.5厘米才明显）
-        _line.startWidth = ConfigManager.TrajectoryLineWidth.Value * 5f;
-        _line.endWidth = ConfigManager.TrajectoryLineWidth.Value * 2.5f;
+        // 线宽：配置值 * 倍率（主线段 x3 / 末端 x1.5）——默认0.015时约 0.045米/4.5厘米
+        _line.startWidth = ConfigManager.TrajectoryLineWidth.Value * 3f;
+        _line.endWidth = ConfigManager.TrajectoryLineWidth.Value * 1.5f;
+        ApplyLineGradient();
         _line.enabled = false;
 
-        _landingSphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-        _landingSphere.transform.localScale = Vector3.one * ConfigManager.LandingPointRadius.Value;
-        _landingSphere.GetComponent<Collider>().enabled = false;
-        _sphereRenderer = _landingSphere.GetComponent<Renderer>();
-        _sphereRenderer.material = new Material(Shader.Find("Sprites/Default"))
+        // 落点中心小点
+        _landingCenterObj = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        _landingCenterObj.GetComponent<Collider>().enabled = false;
+        _landingCenterRenderer = _landingCenterObj.GetComponent<Renderer>();
+        _landingCenterRenderer.material = new Material(shader);
+        _landingCenterRenderer.enabled = false;
+
+        // 落点圆环：贴合碰撞法线、半透明、带淡入/缩放动画
+        _landingRingRoot = new GameObject("LandingRingRoot").transform;
+        _landingRing = _landingRingRoot.gameObject.AddComponent<LineRenderer>();
+        _landingRing.useWorldSpace = true;
+        _ringMaterial = new Material(shader)
         {
             color = ConfigManager.LandingPointColor.Value
         };
-        _sphereRenderer.enabled = false;
+        _landingRing.material = _ringMaterial;
+        _landingRing.positionCount = _ringPoints.Length;
+        _landingRing.SetPositions(_ringPoints);
+        _landingRing.loop = true;
+        _landingRing.numCapVertices = 0;
+        _landingRing.numCornerVertices = 2;
+        _landingRing.startWidth = 0.035f;
+        _landingRing.endWidth = 0.035f;
+        _landingRing.enabled = false;
 
-        Plugin.log.LogInfo("[Trajectory] LineRenderer + 落点Sphere 已创建");
+        Plugin.log.LogInfo("[Trajectory] 抛物线主线 + 落点圆环/中心点 已创建");
+    }
+
+    /// <summary>
+    /// 抛物线颜色：从起点色(Trajectory Color)沿色轮顺时针渐变到末端色(Landing Point Color)，
+    /// 中间自然经过色轮上的过渡色（如 红→...→青 会顺次呈现 橙/黄/绿）。起点透明 → 末端不透明。
+    /// </summary>
+    private void ApplyLineGradient()
+    {
+        var start = ConfigManager.TrajectoryColor.Value;
+        var end = ConfigManager.LandingPointColor.Value;
+        // 配置未变化则不重建（避免每帧分配 Gradient 对象）
+        if (!_gradientDirty && start == _lastGradStart && end == _lastGradEnd)
+            return;
+        _gradientDirty = false;
+        _lastGradStart = start;
+        _lastGradEnd = end;
+
+        Color.RGBToHSV(start, out var sH, out var sS, out var sV);
+        Color.RGBToHSV(end, out var eH, out var eS, out var eV);
+
+        // 屏幕色相 0~1（红=0，青=0.5）：顺时针方向即色相递增方向。
+        // 计算起点到末端的顺时针跨距，保证 eH 落后于 sH 时也走"补一圈"的顺时针路径。
+        var hSpan = ((eH - sH) % 1f + 1f) % 1f;
+
+        const int segs = 7;
+        var colorKeys = new GradientColorKey[segs];
+        colorKeys[0] = new GradientColorKey(start, 0f);
+        colorKeys[segs - 1] = new GradientColorKey(end, 1f);
+        for (var i = 1; i < segs - 1; i++)
+        {
+            var t = i / (float)(segs - 1);
+            var hue = sH + hSpan * t;
+            var sat = Mathf.Lerp(sS, eS, t);
+            var val = Mathf.Lerp(sV, eV, t);
+            colorKeys[i] = new GradientColorKey(Color.HSVToRGB(hue, sat, val), t);
+        }
+
+        _line.colorGradient = new Gradient
+        {
+            colorKeys = colorKeys,
+            alphaKeys = new[]
+            {
+                new GradientAlphaKey(0f, 0f),
+                new GradientAlphaKey(0.6f, 0.5f),
+                new GradientAlphaKey(1f, 1f)
+            }
+        };
+    }
+
+    /// <summary>隐藏全部落点指示（圆环/中心点）</summary>
+    private void HideLanding()
+    {
+        if (_landingRing != null) _landingRing.enabled = false;
+        if (_landingCenterRenderer != null) _landingCenterRenderer.enabled = false;
+        _ringAnimT = -1f;
     }
 
     /// <summary>
@@ -208,8 +300,16 @@ public class TrajectoryRenderer : MonoBehaviour
         if (!ConfigManager.EnableTrajectory.Value)
         {
             if (_line != null) _line.enabled = false;
-            if (_sphereRenderer != null) _sphereRenderer.enabled = false;
+            HideLanding();
             return;
+        }
+
+        // 配置 TrajectoryPoints 变更时重建采样数组（运行中 F12 调整后立即生效）
+        int pointCount = Mathf.Max(2, ConfigManager.TrajectoryPoints.Value);
+        if (_positions == null || _positions.Length != pointCount)
+        {
+            _positions = new Vector3[pointCount];
+            _hasComputed = false;   // 强制下次重算，避免沿用旧缓存
         }
 
         if (_cachedGameWorld == null)
@@ -218,7 +318,7 @@ public class TrajectoryRenderer : MonoBehaviour
         if (gameWorld == null)
         {
             if (_line != null) _line.enabled = false;
-            if (_sphereRenderer != null) _sphereRenderer.enabled = false;
+            HideLanding();
             return;
         }
 
@@ -226,7 +326,7 @@ public class TrajectoryRenderer : MonoBehaviour
         if (player == null || player.HealthController == null || !player.HealthController.IsAlive)
         {
             if (_line != null) _line.enabled = false;
-            if (_sphereRenderer != null) _sphereRenderer.enabled = false;
+            HideLanding();
             return;
         }
 
@@ -244,7 +344,7 @@ public class TrajectoryRenderer : MonoBehaviour
                 Plugin.log.LogInfo($"[Trajectory] 未手持手雷 (当前控制器: {typeName})");
             }
             if (_line != null) _line.enabled = false;
-            if (_sphereRenderer != null) _sphereRenderer.enabled = false;
+            HideLanding();
             return;
         }
 
@@ -267,7 +367,7 @@ public class TrajectoryRenderer : MonoBehaviour
         if (!shouldShow)
         {
             if (_line != null) _line.enabled = false;
-            if (_sphereRenderer != null) _sphereRenderer.enabled = false;
+            HideLanding();
             return;
         }
 
@@ -280,7 +380,15 @@ public class TrajectoryRenderer : MonoBehaviour
             var field = FindGrenadePrefabField(grenadeHandsController.GetType());
             if (field != null)
             {
-                prefab = field.GetValue(grenadeHandsController) as GrenadePrefab;
+                try
+                {
+                    prefab = field.GetValue(grenadeHandsController) as GrenadePrefab;
+                }
+                catch (Exception e)
+                {
+                    // 缓存字段来自不同控制器类型（跨继承链）时 GetValue 可能抛异常；降级用默认质量
+                    Plugin.log.LogWarning($"[Trajectory] 读取 GrenadePrefab 字段失败: {e.Message}");
+                }
             }
 
             if (prefab != null && prefab.GrenadeItself != null && prefab.GrenadeItself.gameObject != null)
@@ -335,25 +443,47 @@ public class TrajectoryRenderer : MonoBehaviour
             positionCount = _lastPositionCount;
         }
 
-        // 更新显示
-        _line.startColor = ConfigManager.TrajectoryColor.Value;
-        _line.endColor = ConfigManager.LandingPointColor.Value;
-        _line.startWidth = ConfigManager.TrajectoryLineWidth.Value * 5f;
-        _line.endWidth = ConfigManager.TrajectoryLineWidth.Value * 2.5f;
+        // 更新显示（彩虹渐变 + 线宽）
+        ApplyLineGradient();
+        _line.startWidth = ConfigManager.TrajectoryLineWidth.Value * 3f;
+        _line.endWidth = ConfigManager.TrajectoryLineWidth.Value * 1.5f;
         _line.positionCount = positionCount;
         _line.SetPositions(_positions);
         _line.enabled = true;
 
         if (collided && positionCount > 0)
         {
-            _sphereRenderer.enabled = true;
-            _landingSphere.transform.position = _positions[positionCount - 1];
-            _sphereRenderer.material.color = ConfigManager.LandingPointColor.Value;
-            _landingSphere.transform.localScale = Vector3.one * ConfigManager.LandingPointRadius.Value;
+            var landingPos = _positions[positionCount - 1];
+
+            // 用最后一段弧线的方向估算落点法线（贴合地面/墙面）
+            var refPos = positionCount >= 2 ? _positions[positionCount - 2] : landingPos;
+            var normal = landingPos - refPos;
+            if (normal.sqrMagnitude < 0.0001f) normal = Vector3.up;
+            normal.Normalize();
+            _lastRingNormal = normal;
+
+            // 中心点（比原实心球更小更精致）
+            _landingCenterRenderer.enabled = true;
+            _landingCenterObj.transform.position = landingPos;
+            _landingCenterRenderer.material.color = ConfigManager.LandingPointColor.Value;
+            _landingCenterObj.transform.localScale = Vector3.one * Mathf.Max(0.06f, ConfigManager.LandingPointRadius.Value * 0.28f);
+
+            // 圆环：贴合法线、半透明淡入 + 从内到外缩放弹开
+            var radius = ConfigManager.LandingPointRadius.Value;
+            _landingRingRoot.position = landingPos;
+            _landingRingRoot.rotation = Quaternion.FromToRotation(Vector3.up, normal);
+            if (_ringAnimT < 0f) _ringAnimT = 0f;
+            _ringAnimT = Mathf.Min(1f, _ringAnimT + Time.deltaTime * 5f);
+            var pop = Mathf.Lerp(0.55f, 1f, _ringAnimT);
+            _landingRingRoot.localScale = Vector3.one * radius * pop;
+            var ringC = ConfigManager.LandingPointColor.Value;
+            ringC.a = Mathf.Lerp(0f, 0.65f, _ringAnimT);
+            _ringMaterial.color = ringC;
+            _landingRing.enabled = true;
         }
         else
         {
-            _sphereRenderer.enabled = false;
+            HideLanding();
         }
     }
 
@@ -417,7 +547,8 @@ public class TrajectoryRenderer : MonoBehaviour
     private void OnDestroy()
     {
         if (_line != null) Destroy(_line);
-        if (_landingSphere != null) Destroy(_landingSphere);
+        if (_landingCenterObj != null) Destroy(_landingCenterObj);
+        if (_landingRingRoot != null) Destroy(_landingRingRoot.gameObject);
     }
 }
 

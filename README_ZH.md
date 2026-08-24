@@ -1,6 +1,6 @@
 # CookingGrenades — 温雷模组
 
-> **版本**: 1.4.1  
+> **版本**: 1.4.2  
 > **适用**: SPT 4.1.0 / BepInEx 5.x / .NET Framework 4.7.2  
 > **BEP插件ID**: `com.Tangh.CookingGrenades`
 

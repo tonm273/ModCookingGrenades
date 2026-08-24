@@ -10,6 +10,45 @@
 
     <h1>CookingGrenades 更新日志</h1>
 
+    <h2>版本 1.4.2 — 原生选择栏屏蔽 &amp; 投雷偏好锁定修复</h2>
+
+    <div class="section">
+        <h3><span class="tag tag-new">新增</span> 新增功能</h3>
+        <ul>
+            <li><strong>原生手雷选择栏屏蔽</strong>：拦截原生按住 G 弹出的手雷选择栏，改为使用模组轮盘，同时保留点按 G 直接投雷功能</li>
+            <li><strong>手雷偏好锁定</strong>：记录用户通过轮盘选择的手雷模板，投掷后自动重新锁定同类剩余手雷，解决"扔第一种雷后再次投掷自动换成其他雷"的问题</li>
+        </ul>
+    </div>
+
+    <div class="section">
+        <h3><span class="tag tag-ui">视觉</span> 视觉优化</h3>
+        <ul>
+            <li><strong>抛物线渐变</strong>：轨迹线起点透明、末端不透明，颜色按色轮顺时针从起点色过渡到末端色（起点/末端颜色可配置）</li>
+            <li><strong>线宽调整</strong>：主线段宽 ×3、末端 ×1.5</li>
+            <li><strong>落点标记</strong>：改为贴合地面的半透明圆环 + 中心小点</li>
+            <li><strong>移除垂直引导线</strong></li>
+        </ul>
+    </div>
+
+    <div class="section">
+        <h3><span class="tag tag-fix">修复</span> 问题修复</h3>
+        <ul>
+            <li><strong>投雷命令误拦截</strong>：修复点按 G 无法投雷、无法换弹（ThrowGrenade/NextGrenadeStage/ReloadWeapon 命令被误拦截）</li>
+            <li><strong>轮盘滚轮卡住</strong>：修复滚动到 X 取消图标时无法继续滚动的问题</li>
+        </ul>
+    </div>
+
+    <div class="section">
+        <h3><span class="tag tag-stab">审查</span> 稳定性与代码审查</h3>
+        <ul>
+            <li><strong>判空防护</strong>：<code>SetNewTopPriorityGrenade</code> 的 itemUiContext 反射获取判空，避免空引用异常</li>
+            <li><strong>异常防护</strong>：抛物线渲染中 <code>field.GetValue</code> 跨继承链访问异常捕获降级</li>
+            <li><strong>配置动态更新</strong>：轨迹采样点数组随配置变更自动重建</li>
+            <li><strong>单例重构</strong>：轮盘单例统一由 <code>WheelBase.GetOrCreateInstance</code> 管理，消除输入补丁冗余创建逻辑</li>
+            <li><strong>线程安全</strong>：引信时间缓存改用独立锁对象，消除锁替换竞态</li>
+        </ul>
+    </div>
+
     <h2>版本 1.4.1 — 联机同步优化 &amp; 稳定性</h2>
 
     <div class="section">

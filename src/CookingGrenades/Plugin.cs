@@ -14,7 +14,7 @@ using UnityEngine;
 
 namespace CookingGrenades;
 
-[BepInPlugin("com.Tangh.CookingGrenades", "CookingGrenades", "1.4.1")]
+[BepInPlugin("com.Tangh.CookingGrenades", "CookingGrenades", "1.4.2")]
 [BepInDependency("com.SPT.core", "3.11.0")]
 public class Plugin : BaseUnityPlugin
 {
@@ -50,6 +50,8 @@ public class Plugin : BaseUnityPlugin
 		TryEnablePatch<EftGamePlayerOwnerTranslateCommandPatch>();
 		TryEnablePatch<ThrowWeapGetExplDelayPatch>();
 		TryEnablePatch<GrenadeWheelInputPatch>();
+		TryEnablePatch<GrenadeSelectorPatch>();
+		TryEnablePatch<SetNewTopPriorityGrenadePatch>();
 		TryEnablePatch<MedicineWheelInputPatch>();
 		// 抛物线预测：在 GameWorld.OnGameStarted 后挂载到 MainPlayer.gameObject（和 VisualAssist 一致）
 		TryEnablePatch<TrajectoryRendererGameWorldStartedPatch>();
