@@ -104,7 +104,9 @@ public class TrajectoryRenderer : MonoBehaviour
         // 落点圆环：贴合碰撞法线、半透明、带淡入/缩放动画
         _landingRingRoot = new GameObject("LandingRingRoot").transform;
         _landingRing = _landingRingRoot.gameObject.AddComponent<LineRenderer>();
-        _landingRing.useWorldSpace = true;
+        // 必须为 false：圆环顶点才能随 _landingRingRoot 的 position/rotation/localScale 变换
+        //（贴合落点法线、定位到落点、淡入弹开缩放），否则圆环被固定在世界原点。
+        _landingRing.useWorldSpace = false;
         _ringMaterial = new Material(shader)
         {
             color = ConfigManager.LandingPointColor.Value

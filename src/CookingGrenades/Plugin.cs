@@ -64,8 +64,6 @@ public class Plugin : BaseUnityPlugin
 		TryEnablePatch<GrenadeSelectorPatch>();
 		TryEnablePatch<SetNewTopPriorityGrenadePatch>();
 		TryEnablePatch<MedicineWheelInputPatch>();
-		TryEnablePatch<PlayerLookPatch>();
-		TryEnablePatch<PlayerMouseLookPatch>();
 		// 抛物线预测：在 GameWorld.OnGameStarted 后挂载到 MainPlayer.gameObject（和 VisualAssist 一致）
 		TryEnablePatch<TrajectoryRendererGameWorldStartedPatch>();
 		TryEnablePatch<TrajectoryRendererPlayerDisposePatch>();

@@ -114,7 +114,18 @@ public class GrenadeCookingTimer
 	private IEnumerator ForceThrowCoroutine(EFT.Player.GrenadeHandsController controller)
 	{
 		// 引信剩余 AutoThrowLeadTime 秒时强制投出，避免在手中爆炸（可配置，默认 0.8s）
-		yield return (object)new WaitForSeconds(controller.Item.GetExplDelay - Math.Max(ConfigManager.AutoThrowLeadTime.Value, 0.05f));
+		float delay;
+		try
+		{
+			if (controller.Item == null) yield break;
+			delay = controller.Item.GetExplDelay - Math.Max(ConfigManager.AutoThrowLeadTime.Value, 0.05f);
+		}
+		catch (System.Exception ex)
+		{
+			Plugin.log.LogError($"[GrenadeCookingTimer] 读取引信延迟失败，取消强制投出: {ex.Message}");
+			yield break;
+		}
+		yield return (object)new WaitForSeconds(Math.Max(delay, 0f));
 		if (IsCooking && controller != null)
 		{
 			ForceThrow(controller);
