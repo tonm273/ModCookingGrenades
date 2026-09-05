@@ -32,6 +32,17 @@ public class Plugin : BaseUnityPlugin
 		ConfigEventHandler.Init();
 		FuseTimeTester.Init();
 
+		// 预烤轮盘程序化纹理（圆环/分隔线 + 常见扇区数的扇形/弧段），
+		// 把生成开销从"每次打开轮盘"转移到"一次开机"，消除打开卡顿
+		try
+		{
+			WheelTextureCache.WarmUp(12);
+		}
+		catch (Exception e)
+		{
+			log.LogWarning($"[WheelTextureCache] 预热失败（将按需生成）: {e.Message}");
+		}
+
 		// 手雷轮盘：跨场景持久化单例
 		var wheelObj = new GameObject("GrenadeWheel");
 		DontDestroyOnLoad(wheelObj);
@@ -53,6 +64,8 @@ public class Plugin : BaseUnityPlugin
 		TryEnablePatch<GrenadeSelectorPatch>();
 		TryEnablePatch<SetNewTopPriorityGrenadePatch>();
 		TryEnablePatch<MedicineWheelInputPatch>();
+		TryEnablePatch<PlayerLookPatch>();
+		TryEnablePatch<PlayerMouseLookPatch>();
 		// 抛物线预测：在 GameWorld.OnGameStarted 后挂载到 MainPlayer.gameObject（和 VisualAssist 一致）
 		TryEnablePatch<TrajectoryRendererGameWorldStartedPatch>();
 		TryEnablePatch<TrajectoryRendererPlayerDisposePatch>();
@@ -91,7 +104,7 @@ public class Plugin : BaseUnityPlugin
 			fikaFound |= PatchClientGrenadeThrow("Fika.Core.Main.ClientClasses.HandsControllers.FikaClientQuickGrenadeController");
 			fikaFound |= PatchGrenadePacket();
 			fikaFound |= PatchObservedSpawn("Fika.Core.Main.ObservedClasses.HandsControllers.ObservedGrenadeController");
-			fikaFound |= PatchObservedSpawn("Fika.Core.Main.ObservedClasses.HandsControllers.ObservedQuickGrenadeController");
+		fikaFound |= PatchObservedSpawn("Fika.Core.Main.ObservedClasses.HandsControllers.ObservedQuickGrenadeController");
 
 			log.LogInfo(fikaFound
 				? "[Fika] 联机同步补丁已启用（检测到 Fika）"
@@ -217,12 +230,19 @@ internal static class PacketCookTimeStore
 internal static class FikaPatches_ClientGrenadeThrow
 {
 	public static void Prefix(float timeSinceSafetyLevelRemoved)
-	{
-		if (timeSinceSafetyLevelRemoved > 0f)
 		{
-			Plugin.NextCookTime = timeSinceSafetyLevelRemoved;
+			// 权威烹饪时长：Fika 的 timeSinceSafetyLevelRemoved 在本模组走 Grenade.Init 注入引信时
+			// 通常为 0/不可靠（headless 端多处实测 cook=0）。优先取模组自身烹饪计时器的已烹饪时间。
+			float modCook = GrenadeCookingManager.GetCookingTimer().IsCooking
+				? Mathf.Max(0f, GrenadeCookingManager.GetCookingTimer().GetCookingTime())
+				: 0f;
+			float cook = Mathf.Max(modCook, timeSinceSafetyLevelRemoved);
+			if (cook > 0f)
+			{
+				Plugin.NextCookTime = cook;
+				Plugin.log.LogInfo($"[CG-Fika][Throw] 本次投掷 cook={cook:F2}s (mod={modCook:F2}, fika={timeSinceSafetyLevelRemoved:F2})");
+			}
 		}
-	}
 }
 
 /// <summary>序列化时在包尾写入烹饪时长（无条件写入以保持字节流一致，0 表示未烹饪），随后清零</summary>
@@ -314,16 +334,29 @@ internal static class FikaPatches_GrenadePacketExecute
 	private static readonly ConcurrentDictionary<Type, PropertyInfo> HandsControllerProps = new ConcurrentDictionary<Type, PropertyInfo>();
 
 	public static void Prefix(object __instance, object player)
-	{
-		if (__instance == null || player == null) return;
-		if (!PacketCookTimeStore.TryGet(__instance, out var cookTime)) return;
+		{
+			if (__instance == null || player == null)
+			{
+				Plugin.log.LogWarning("[CG-Fika][Execute] __instance 或 player 为 null，跳过 cook 绑定");
+				return;
+			}
+			if (!PacketCookTimeStore.TryGet(__instance, out var cookTime))
+			{
+				Plugin.log.LogDebug("[CG-Fika][Execute] 包内未检出 cookTime（可能未烹饪）");
+				return;
+			}
 
-		// 通过 player.HandsController 拿到本次 spawning 的目标 controller
-		var handsController = GetHandsController(player);
-		if (handsController == null) return;
+			// 通过 player.HandsController 拿到本次 spawning 的目标 controller
+			var handsController = GetHandsController(player);
+			if (handsController == null)
+			{
+				Plugin.log.LogWarning($"[CG-Fika][Execute] 检出 cookTime={cookTime:F2}，但 player.HandsController 为 null，无法绑定（headless 无本地玩家的同步断点之一）");
+				return;
+			}
 
-		ObservedControllerCookStore.Set(handsController, cookTime);
-	}
+			Plugin.log.LogInfo($"[CG-Fika][Execute] 绑定 cook={cookTime:F2}s 到 HandsController={handsController.GetType().Name}");
+			ObservedControllerCookStore.Set(handsController, cookTime);
+		}
 
 	private static object GetHandsController(object player)
 	{
@@ -355,14 +388,20 @@ internal static class FikaPatches_GrenadePacketExecute
 internal static class FikaPatches_ObservedGrenadeSpawn
 {
 	public static void Prefix(object __instance, ref float timeSinceSafetyLevelRemoved)
-	{
-		// __instance 是当前 spawn 手雷的 target controller；从它取回绑定 cook
-		if (__instance == null) return;
-
-		float cook = ObservedControllerCookStore.Take(__instance);
-		if (cook > 0f)
 		{
-			timeSinceSafetyLevelRemoved = cook;
+			// __instance 是当前 spawn 手雷的 target controller；从它取回绑定 cook
+			if (__instance == null) return;
+
+			float oldVal = timeSinceSafetyLevelRemoved;
+			float cook = ObservedControllerCookStore.Take(__instance);
+			if (cook > 0f)
+			{
+				timeSinceSafetyLevelRemoved = cook;
+				Plugin.log.LogInfo($"[CG-Fika][SpawnGrenade] 注入 cook: {oldVal:F2} -> {cook:F2}s (controller={__instance.GetType().Name})");
+			}
+			else
+			{
+				Plugin.log.LogWarning($"[CG-Fika][SpawnGrenade] 未取到 cook（controller={__instance.GetType().Name}），手雷将用默认引信 {oldVal:F2}s");
+			}
 		}
-	}
 }

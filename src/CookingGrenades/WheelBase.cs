@@ -41,11 +41,6 @@ public abstract class WheelBase<T> : MonoBehaviour where T : WheelBase<T>
     private const float CenterDeadZone = 35f;
     private const float RaidDelay = 3f;
     private const float HoldDuration = 0.5f;
-    private const int RingTexSize = 700;
-    private const float CircleInnerR = 160f;
-    private const float CircleOuterR = 163f;
-    private const float DividerInnerR = 163f;
-    private const float DividerOuterR = 366f;
     private const float RingDisplaySize = 620f;
     private const float HighlightSmoothing = 15f;
 
@@ -324,11 +319,10 @@ public abstract class WheelBase<T> : MonoBehaviour where T : WheelBase<T>
         // 扇区比手雷多一格：末尾一格为原版手雷栏的"✕ 取消"
         int sectorCount = count + 1;
 
-        float scale = RingDisplaySize / RingTexSize;
+        float scale = RingDisplaySize / WheelTextureCache.RingTexSize;
 
-        // 1. 白色圆环
-        var circleTex = CreateCircleRingTexture(RingTexSize, CircleInnerR, CircleOuterR);
-        var circleSprite = Sprite.Create(circleTex, new Rect(0, 0, RingTexSize, RingTexSize), new Vector2(0.5f, 0.5f));
+        // 1. 白色圆环（恒定形状，静态缓存）
+        var circleSprite = WheelTextureCache.CircleRingSprite;
         var circleObj = new GameObject("CircleRing");
         circleObj.transform.SetParent(canvasObj.transform, false);
         var circleImage = circleObj.AddComponent<Image>();
@@ -340,9 +334,8 @@ public abstract class WheelBase<T> : MonoBehaviour where T : WheelBase<T>
         circleRect.anchoredPosition = Vector2.zero;
         circleRect.sizeDelta = new Vector2(RingDisplaySize, RingDisplaySize);
 
-        // 2. 分隔线（单独对象，仅选中区域显示）
-        var divTex = CreateSingleDividerTexture(RingTexSize, DividerInnerR, DividerOuterR, 2f);
-        var divSprite = Sprite.Create(divTex, new Rect(0, 0, RingTexSize, RingTexSize), new Vector2(0.5f, 0.5f));
+        // 2. 分隔线（单独对象，仅选中区域显示；纹理恒定形状，静态缓存）
+        var divSprite = WheelTextureCache.DividerSprite;
         _dividerObjects.Clear();
         for (int i = 0; i < sectorCount; i++)
         {
@@ -364,12 +357,8 @@ public abstract class WheelBase<T> : MonoBehaviour where T : WheelBase<T>
             _dividerObjects.Add(divObj);
         }
 
-        // 3. 扇形区域高亮（覆盖选中槽位的整个图标区域，淡灰色由内向外渐浅至透明）
-        float sectorArcDeg = 360f / sectorCount;
-        float sectorInnerR = CircleOuterR - 2f;
-        float sectorOuterR = DividerOuterR + 40f;
-        var secTex = CreateSectorHighlightTexture(RingTexSize, sectorInnerR, sectorOuterR, sectorArcDeg);
-        var secSprite = Sprite.Create(secTex, new Rect(0, 0, RingTexSize, RingTexSize), new Vector2(0.5f, 0.5f));
+        // 3. 扇形区域高亮（覆盖选中槽位的整个图标区域，淡灰色由内向外渐浅至透明；按 sectorCount 缓存）
+        var secSprite = WheelTextureCache.GetSectorSprite(sectorCount);
         var secObj = new GameObject("SectorHighlight");
         secObj.transform.SetParent(canvasObj.transform, false);
         var secImage = secObj.AddComponent<Image>();
@@ -383,10 +372,8 @@ public abstract class WheelBase<T> : MonoBehaviour where T : WheelBase<T>
         _sectorHighlightObj = secObj;
         _sectorHighlightObj.SetActive(false);
 
-        // 4. 高亮弧段（可旋转，贴圆环内壁滑动）
-        float hlArcDeg = (360f / sectorCount) * 0.75f;
-        var hlTex = CreateHighlightArcTexture(RingTexSize, CircleInnerR - 10f, CircleInnerR - 3f, hlArcDeg);
-        var hlSprite = Sprite.Create(hlTex, new Rect(0, 0, RingTexSize, RingTexSize), new Vector2(0.5f, 0.5f));
+        // 4. 高亮弧段（可旋转，贴圆环内壁滑动；按 sectorCount 缓存）
+        var hlSprite = WheelTextureCache.GetArcSprite(sectorCount);
         var hlObj = new GameObject("Highlight");
         hlObj.transform.SetParent(canvasObj.transform, false);
         var hlImage = hlObj.AddComponent<Image>();
@@ -401,7 +388,7 @@ public abstract class WheelBase<T> : MonoBehaviour where T : WheelBase<T>
         _highlightObj.SetActive(false);
 
         // 5. 槽位（图标 + 名称文字 + 数量文字）
-        float textRadius = ((CircleOuterR + DividerOuterR) / 2f) * scale;
+        float textRadius = ((WheelTextureCache.CircleOuterR + WheelTextureCache.DividerOuterR) / 2f) * scale;
         for (int i = 0; i < count; i++)
         {
             float angleDeg = 90f - (360f / sectorCount) * i;
@@ -748,143 +735,6 @@ public abstract class WheelBase<T> : MonoBehaviour where T : WheelBase<T>
             _centerLabel.color = new Color(1, 1, 1, 0.6f);
         }
         _selectedIndex = -1;
-    }
-
-    private Texture2D CreateCircleRingTexture(int texSize, float innerR, float outerR)
-    {
-        var tex = new Texture2D(texSize, texSize, TextureFormat.RGBA32, false);
-        var pixels = new Color32[texSize * texSize];
-        var center = new Vector2(texSize / 2f, texSize / 2f);
-        var ringColor = new Color32(200, 200, 200, 220);
-        var empty = new Color32(0, 0, 0, 0);
-        for (int y = 0; y < texSize; y++)
-        {
-            for (int x = 0; x < texSize; x++)
-            {
-                float dist = Vector2.Distance(new Vector2(x, y), center);
-                pixels[y * texSize + x] = (dist >= innerR && dist <= outerR) ? ringColor : empty;
-            }
-        }
-        tex.SetPixels32(pixels);
-        tex.Apply();
-        return tex;
-    }
-
-    private Texture2D CreateSingleDividerTexture(int texSize, float innerR, float outerR, float lineHalfWidth)
-    {
-        var tex = new Texture2D(texSize, texSize, TextureFormat.RGBA32, false);
-        var pixels = new Color32[texSize * texSize];
-        for (int i = 0; i < pixels.Length; i++)
-            pixels[i] = new Color32(0, 0, 0, 0);
-        var center = new Vector2(texSize / 2f, texSize / 2f);
-
-        for (float r = innerR; r <= outerR; r += 0.5f)
-        {
-            float t = (r - innerR) / (outerR - innerR);
-            byte alpha = (byte)Mathf.Lerp(200, 0, t);
-            var color = new Color32(255, 255, 255, alpha);
-
-            for (float w = -lineHalfWidth; w <= lineHalfWidth; w += 0.5f)
-            {
-                float px = center.x + w;
-                float py = center.y + r;
-                int x = Mathf.RoundToInt(px);
-                int y = Mathf.RoundToInt(py);
-                if (x >= 0 && x < texSize && y >= 0 && y < texSize)
-                    pixels[y * texSize + x] = color;
-            }
-        }
-
-        tex.SetPixels32(pixels);
-        tex.Apply();
-        return tex;
-    }
-
-    private Texture2D CreateHighlightArcTexture(int texSize, float innerR, float outerR, float arcDeg)
-    {
-        var tex = new Texture2D(texSize, texSize, TextureFormat.RGBA32, false);
-        var pixels = new Color32[texSize * texSize];
-        var center = new Vector2(texSize / 2f, texSize / 2f);
-        float halfArc = arcDeg / 2f;
-        var fill = new Color32(255, 255, 255, 255);
-        var empty = new Color32(0, 0, 0, 0);
-
-        for (int y = 0; y < texSize; y++)
-        {
-            for (int x = 0; x < texSize; x++)
-            {
-                float dx = x - center.x;
-                float dy = y - center.y;
-                float dist = Mathf.Sqrt(dx * dx + dy * dy);
-
-                if (dist >= innerR && dist <= outerR)
-                {
-                    float angle = Mathf.Atan2(dy, dx) * Mathf.Rad2Deg;
-                    if (angle < 0) angle += 360;
-                    float diff = angle - 90f;
-                    if (diff > 180) diff -= 360;
-                    if (diff < -180) diff += 360;
-                    pixels[y * texSize + x] = Mathf.Abs(diff) <= halfArc ? fill : empty;
-                }
-                else
-                {
-                    pixels[y * texSize + x] = empty;
-                }
-            }
-        }
-
-        tex.SetPixels32(pixels);
-        tex.Apply();
-        tex.wrapMode = TextureWrapMode.Clamp;
-        return tex;
-    }
-
-    private Texture2D CreateSectorHighlightTexture(int texSize, float innerR, float outerR, float arcDeg)
-    {
-        var tex = new Texture2D(texSize, texSize, TextureFormat.RGBA32, false);
-        var pixels = new Color32[texSize * texSize];
-        var center = new Vector2(texSize / 2f, texSize / 2f);
-        float halfArc = arcDeg / 2f;
-        var empty = new Color32(0, 0, 0, 0);
-
-        for (int y = 0; y < texSize; y++)
-        {
-            for (int x = 0; x < texSize; x++)
-            {
-                float dx = x - center.x;
-                float dy = y - center.y;
-                float dist = Mathf.Sqrt(dx * dx + dy * dy);
-
-                if (dist >= innerR && dist <= outerR)
-                {
-                    float angle = Mathf.Atan2(dy, dx) * Mathf.Rad2Deg;
-                    if (angle < 0) angle += 360;
-                    float diff = angle - 90f;
-                    if (diff > 180) diff -= 360;
-                    if (diff < -180) diff += 360;
-
-                    if (Mathf.Abs(diff) <= halfArc)
-                    {
-                        float t = (dist - innerR) / (outerR - innerR);
-                        byte a = (byte)Mathf.RoundToInt(Mathf.Lerp(0.35f, 0f, t) * 255f);
-                        pixels[y * texSize + x] = new Color32(160, 160, 160, a);
-                    }
-                    else
-                    {
-                        pixels[y * texSize + x] = empty;
-                    }
-                }
-                else
-                {
-                    pixels[y * texSize + x] = empty;
-                }
-            }
-        }
-
-        tex.SetPixels32(pixels);
-        tex.Apply();
-        tex.wrapMode = TextureWrapMode.Clamp;
-        return tex;
     }
 
     protected virtual void OnDestroy()
