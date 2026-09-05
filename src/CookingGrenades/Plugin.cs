@@ -14,7 +14,7 @@ using UnityEngine;
 
 namespace CookingGrenades;
 
-[BepInPlugin("com.Tangh.CookingGrenades", "CookingGrenades", "1.4.2")]
+[BepInPlugin("com.Tangh.CookingGrenades", "CookingGrenades", "1.4.3")]
 [BepInDependency("com.SPT.core", "3.11.0")]
 public class Plugin : BaseUnityPlugin
 {
