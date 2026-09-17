@@ -50,12 +50,14 @@ internal static class ConfigManager
 	// 手雷轮盘配置
 	public static ConfigEntry<bool> EnableGrenadeWheel;
 	public static ConfigEntry<KeyCode> GrenadeWheelKey;
+	public static ConfigEntry<float> GrenadeWheelHoldDuration;
 	public static ConfigEntry<bool> EquipImmediatelyOnSelect;
 	public static ConfigEntry<bool> SwitchImmediatelyWhenHolding;
 
 	// 医药轮盘配置
 	public static ConfigEntry<bool> EnableMedicineWheel;
 	public static ConfigEntry<KeyCode> MedicineWheelKey;
+	public static ConfigEntry<float> MedicineWheelHoldDuration;
 	public static ConfigEntry<bool> MedicineWheelScanSecure;
 	public static ConfigEntry<bool> MedicineWheelScanBackpack;
 	public static ConfigEntry<bool> MedicineWheelIncludeFood;
@@ -211,6 +213,10 @@ internal static class ConfigManager
 		{
 			new ConfigurationManagerAttributes { Order = 7 }
 		}));
+		GrenadeWheelHoldDuration = configFile.Bind<float>("6. Grenade Wheel", "Hold Duration To Open (s)", 0.5f, new ConfigDescription("How long (seconds) to hold the key before the grenade wheel opens.", new AcceptableValueRange<float>(0.1f, 2f), new object[1]
+		{
+			new ConfigurationManagerAttributes { Order = 6 }
+		}));
 
 		// 医药轮盘配置
 		EnableMedicineWheel = configFile.Bind<bool>("7. Medicine Wheel", "Enable Medicine Wheel", true, new ConfigDescription("Enable the medicine wheel selector. Hold the configured key to show a radial wheel of available medicine, move mouse to select, release to use.", null, new object[1]
@@ -232,6 +238,10 @@ internal static class ConfigManager
 		MedicineWheelIncludeFood = configFile.Bind<bool>("7. Medicine Wheel", "Include Food And Drinks", true, new ConfigDescription("If enabled, food and drinks also appear in the medicine wheel.", null, new object[1]
 		{
 			new ConfigurationManagerAttributes { Order = 6 }
+		}));
+		MedicineWheelHoldDuration = configFile.Bind<float>("7. Medicine Wheel", "Hold Duration To Open (s)", 0.5f, new ConfigDescription("How long (seconds) to hold the key before the medicine wheel opens.", new AcceptableValueRange<float>(0.1f, 2f), new object[1]
+		{
+			new ConfigurationManagerAttributes { Order = 5 }
 		}));
 	}
 }

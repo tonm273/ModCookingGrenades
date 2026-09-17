@@ -34,6 +34,10 @@
       <HintPath>$(Managed)\Assembly-CSharp.dll</HintPath>
       <Private>false</Private>
     </Reference>
+    <Reference Include="ItemComponent.Types">
+      <HintPath>$(Managed)\ItemComponent.Types.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
     <Reference Include="BepInEx">
       <HintPath>$(BepInExCore)\BepInEx.dll</HintPath>
       <Private>false</Private>

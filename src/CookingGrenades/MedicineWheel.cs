@@ -38,6 +38,8 @@ public class MedicineWheel : WheelBase<MedicineWheel>
 
     protected override KeyCode HoldKey => ConfigManager.MedicineWheelKey.Value;
 
+    protected override float HoldDuration => ConfigManager.MedicineWheelHoldDuration.Value;
+
     protected override bool IsOtherWheelOpen() =>
         GrenadeWheel.Instance != null && GrenadeWheel.Instance.IsOpen;
 
@@ -144,7 +146,9 @@ public class MedicineWheel : WheelBase<MedicineWheel>
                 .GroupBy(it => it.TemplateId.ToString())
                 .Select(g =>
                 {
-                    var first = g.First();
+                    // 同模板内按当前耐久升序取第一个：优先使用低耐久物品（先把残品耗尽）。
+                    // 同一模板的 MaxHpResource 相同，绝对耐久与耐久比例排序等价；无耐久组件排最后，行为同原"取遍历首个"。
+                    var first = g.OrderBy(GetItemDurability).First();
                     // Name/ShortName 返回的是本地化 key（如 "5751a25924597722c463c472 Name"），必须 .Localized() 才能显示中文
                     return new GroupedMedicine
                     {
@@ -158,7 +162,11 @@ public class MedicineWheel : WheelBase<MedicineWheel>
                 }));
 
             foreach (var dm in _displayedMedicine)
-                Plugin.log.LogInfo($"[MedicineWheel] 分组: {dm.FullName} x{dm.Count}");
+            {
+                float dur = GetItemDurability(dm.FirstItem);
+                string durStr = dur >= float.MaxValue ? "无耐久" : $"{dur * 100f:F0}%";
+                Plugin.log.LogInfo($"[MedicineWheel] 分组: {dm.FullName} x{dm.Count} (优先用耐久 {durStr})");
+            }
         }
         catch (Exception e)
         {
@@ -184,6 +192,29 @@ public class MedicineWheel : WheelBase<MedicineWheel>
             cursor = next;
         }
         return false;
+    }
+
+    /// <summary>
+    /// 获取物品当前耐久比例（RelativeValue，0~1：1=全新，0=耗尽）。
+    /// 医疗品（Meds，含急救包/绷带/兴奋剂等）经 MedKitComponent 读取，食物饮水经 FoodDrinkComponent 读取，
+    /// 两者均实现 IRelativeComponent。同一模板内 MaxResource 相同，比例与绝对耐久排序等价；
+    /// 无耐久组件的物品返回 float.MaxValue，排序时排最后（保持原"取遍历首个"行为）。
+    /// </summary>
+    private static float GetItemDurability(Item item)
+    {
+        try
+        {
+            var medkit = item.GetItemComponent<MedKitComponent>();
+            if (medkit != null) return medkit.RelativeValue;
+
+            var food = item.GetItemComponent<FoodDrinkComponent>();
+            if (food != null) return food.RelativeValue;
+        }
+        catch (Exception e)
+        {
+            Plugin.log.LogWarning($"[MedicineWheel] 读取物品耐久失败: {e.Message}");
+        }
+        return float.MaxValue;
     }
 
     // ── 选中行为 ───────────────────────────────────────────────

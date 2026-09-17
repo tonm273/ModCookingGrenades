@@ -39,6 +39,8 @@ public class GrenadeWheel : WheelBase<GrenadeWheel>
 
     protected override KeyCode HoldKey => ConfigManager.GrenadeWheelKey.Value;
 
+    protected override float HoldDuration => ConfigManager.GrenadeWheelHoldDuration.Value;
+
     protected override bool IsOtherWheelOpen() =>
         MedicineWheel.Instance != null && MedicineWheel.Instance.IsOpen;
 

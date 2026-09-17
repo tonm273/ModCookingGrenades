@@ -40,7 +40,6 @@ public abstract class WheelBase<T> : MonoBehaviour where T : WheelBase<T>
 
     private const float CenterDeadZone = 35f;
     private const float RaidDelay = 3f;
-    private const float HoldDuration = 0.5f;
     private const float RingDisplaySize = 620f;
     private const float HighlightSmoothing = 15f;
 
@@ -84,6 +83,9 @@ public abstract class WheelBase<T> : MonoBehaviour where T : WheelBase<T>
 
     /// <summary>长按唤出轮盘的按键</summary>
     protected abstract KeyCode HoldKey { get; }
+
+    /// <summary>长按多少秒后呼出轮盘（对应各自配置，默认 0.5s）</summary>
+    protected abstract float HoldDuration { get; }
 
     /// <summary>互斥：另一个轮盘当前是否打开</summary>
     protected abstract bool IsOtherWheelOpen();
